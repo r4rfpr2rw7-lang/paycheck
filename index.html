@@ -1,0 +1,1059 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Paycheck">
+<meta name="theme-color" content="#d9f0ff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15132a" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Paycheck Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;600;700;800;900&display=swap">
+<style>
+/* Layout: setup and hours on the left (stack on phone); the take-home plate on the right.
+   Look: Saturday-morning cartoon. Sky blue page, white cards with thick ink outlines and hard drop
+   shadows, a mint-green take-home plate, bright blue buttons, tomato red for weekends and alerts. */
+:root{
+  --bg:#d9f0ff; --panel:#ffffff; --ink:#1d1a33; --muted:#4a4766; --line:#c6d3e6;
+  --edge:#1d1a33; --shadow-c:#1d1a33;
+  --accent:#1f5bea; --on-accent:#ffffff; --accent-soft:#e3ecff; --plate:#7fe3b0; --on-plate:#1d1a33; --rivet:#1d1a33;
+  --good:#0b7d3e; --warn:#d63c14; --mint:#b9f0d4;
+  --f-display:"Lilita One","Arial Rounded MT Bold","Trebuchet MS",sans-serif;
+  --f-body:"Nunito",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-num:"Nunito",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#15132a; --panel:#221f3d; --ink:#f3f1ff; --muted:#c4c0e2; --line:#3e3a68;
+  --edge:#7d77c0; --shadow-c:#05040c;
+  --accent:#8fb0ff; --on-accent:#15132a; --accent-soft:#2c2a55; --plate:#7fe3b0; --on-plate:#1d1a33; --rivet:#1d1a33;
+  --good:#6fe0a0; --warn:#ff8a65; --mint:#1f4a3a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#15132a; --panel:#221f3d; --ink:#f3f1ff; --muted:#c4c0e2; --line:#3e3a68;
+  --edge:#7d77c0; --shadow-c:#05040c;
+  --accent:#8fb0ff; --on-accent:#15132a; --accent-soft:#2c2a55; --plate:#7fe3b0; --on-plate:#1d1a33; --rivet:#1d1a33;
+  --good:#6fe0a0; --warn:#ff8a65; --mint:#1f4a3a; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.55}
+.wrap{max-width:1040px;margin:0 auto;padding-block:20px 40px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:12px;margin-bottom:18px;padding-bottom:14px;border-bottom:2px solid var(--ink)}
+h1{font-family:var(--f-display);font-weight:800;font-size:38px;line-height:.95;letter-spacing:.02em;text-transform:uppercase;margin:0;text-wrap:balance}
+.sub{color:var(--muted);font-size:14px;margin:4px 0 0;font-stretch:85%;letter-spacing:.02em}
+.seg{display:inline-flex;border:1.5px solid var(--ink);border-radius:3px;overflow:hidden;background:var(--panel)}
+.seg button{font:600 14px var(--f-body);font-stretch:90%;letter-spacing:.01em;border:0;background:none;color:var(--ink);padding:9px 14px;cursor:pointer}
+.seg button+button{border-left:1.5px solid var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media (max-width:760px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:18px;min-width:0}
+.label{font:600 12.5px var(--f-body);font-stretch:80%;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px}
+.field{display:flex;flex-direction:column;gap:4px;flex:1 1 120px;min-width:0}
+.field label{font-size:14px;color:var(--muted)}
+input[type=number],input[type=text],select{font:500 16px var(--f-num);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-bottom:1.5px solid var(--muted);border-radius:2px;padding:8px;width:100%}
+input:focus-visible,select:focus-visible,button:focus-visible,[role=button]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.days{display:grid;grid-template-columns:58px repeat(7,minmax(0,1fr));gap:5px 5px;margin-bottom:6px;align-items:center}
+.days .rl{font:600 11.5px var(--f-body);font-stretch:85%;color:var(--muted)}
+.days .dn{font:700 13px var(--f-body);font-stretch:85%;letter-spacing:0;color:var(--ink);background:none;border:0;border-bottom:2px solid transparent;padding:2px 0;cursor:pointer;text-align:center}
+.days .dn.we{color:var(--warn)}
+.days .dn[aria-pressed="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.days input{text-align:center;padding:8px 2px}
+.days input.pto{padding:7px 2px;font-size:16px}
+.hd{font:700 13px var(--f-body);letter-spacing:.04em;border:1px solid var(--line);background:var(--bg);color:var(--muted);border-radius:2px;padding:7px 0;cursor:pointer;width:100%}
+.hd.locked{cursor:default;opacity:1}
+.hd:disabled:not(.locked){opacity:.35;cursor:default}
+.hd[aria-pressed="true"]{background:var(--warn);border-color:var(--warn);color:#fff}
+.wkhead{display:flex;align-items:baseline;gap:10px;margin-top:6px}
+.wkhead .label{margin:0 0 6px;color:var(--ink)}
+.wkt{font:500 12.5px var(--f-num);color:var(--accent)}
+.mini{margin-left:auto;font:600 13.5px var(--f-body);letter-spacing:0;border:1px solid var(--ink);background:var(--panel);color:var(--ink);border-radius:2px;padding:6px 12px;cursor:pointer}
+.mini:hover{background:var(--accent-soft)}
+.savebar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-left:auto}
+.savebar .mini{margin-left:0}
+.savedtxt{font-size:12px;color:var(--good)}
+.setup{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px 0;margin-bottom:16px}
+.setup>summary{cursor:pointer;font:500 14px var(--f-body);color:var(--ink);list-style:none;display:flex;justify-content:space-between;gap:10px}
+.setup>summary::-webkit-details-marker{display:none}
+.setup>summary::after{content:"Edit";color:var(--accent);font-weight:700;flex:none;font-size:13.5px;align-self:center}
+.setup[open]>summary{margin-bottom:12px}
+.setup[open]>summary::after{content:"Done"}
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.presets button{font:500 14px var(--f-body);border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:2px;padding:6px 11px;cursor:pointer}
+.presets button:hover{border-color:var(--ink)}
+.presets button.armed,.mini.armed{border-color:var(--warn);color:var(--warn);font-weight:700}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:15px;margin-bottom:10px;cursor:pointer}
+.check input{margin-top:3px;accent-color:var(--accent)}
+.hint{font-size:14px;line-height:1.5;color:var(--muted);margin:0 0 14px}
+/* The data plate: the one loud element */
+.net{position:relative;border:2px solid var(--ink);border-radius:3px;padding:16px 18px 14px;margin-bottom:16px;
+  background-color:var(--plate);
+  background-image:radial-gradient(circle,var(--rivet) 2.4px,transparent 3px),radial-gradient(circle,var(--rivet) 2.4px,transparent 3px),radial-gradient(circle,var(--rivet) 2.4px,transparent 3px),radial-gradient(circle,var(--rivet) 2.4px,transparent 3px);
+  background-size:10px 10px;background-repeat:no-repeat;
+  background-position:5px 5px,right 5px top 5px,5px bottom 5px,right 5px bottom 5px}
+.net .big{font:600 42px var(--f-num);letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.1;margin:2px 0}
+.net .cap{font:800 15px var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--ink)}
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--ink)}
+.kpis div{font-size:12.5px;color:var(--ink)}
+.kpis b{display:block;font:500 15px var(--f-num);letter-spacing:0;text-transform:none;color:var(--ink);font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+td{padding:8px 0;border-bottom:1px dotted var(--line);font-size:15px;vertical-align:top}
+td.n{text-align:right;font-family:var(--f-num);white-space:nowrap;padding-left:8px}
+td small{display:block;color:var(--muted);font-size:13px;line-height:1.4}
+tr.tot td{border-bottom:0;border-top:2px solid var(--ink);font-weight:700;padding-top:8px}
+.sec{margin:16px 0 4px}
+.note{font-size:14px;line-height:1.5;color:var(--muted);margin-top:14px}
+.modal{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(10,14,12,.6);padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.sheet{background:var(--panel);color:var(--ink);border:2px solid var(--ink);border-radius:3px;padding:20px;max-width:440px;width:100%;max-height:100%;overflow:auto}
+.sheet h2{font:800 28px var(--f-display);text-transform:uppercase;letter-spacing:.02em;margin:0 0 10px;text-wrap:balance}
+.sheet ul{margin:0 0 12px;padding-left:20px;display:grid;gap:6px}
+.primary{font:700 15px var(--f-body);letter-spacing:0;background:var(--accent);color:var(--on-accent);border:0;border-radius:2px;padding:12px 18px;cursor:pointer;width:100%}
+.btns{display:flex;gap:8px;margin-top:14px}
+.btns .primary{width:auto;flex:1}
+.secondary{font:700 15px var(--f-body);letter-spacing:0;background:var(--panel);color:var(--ink);border:1.5px solid var(--ink);border-radius:2px;padding:11px 18px;cursor:pointer;flex:1}
+#defMsg{margin:0;font-size:14.5px}
+.lab{display:flex;align-items:center;gap:6px;min-width:0}
+.ib{flex:none;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--accent);background:var(--panel);color:var(--accent);font:700 11px var(--f-num);line-height:1;padding:0;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.ib[aria-expanded="true"]{background:var(--accent);color:var(--on-accent)}
+.check .ib{margin-top:2px}
+.info{font-size:14px;line-height:1.45;color:var(--ink);background:var(--accent-soft);border-left:3px solid var(--accent);border-radius:0 2px 2px 0;padding:7px 9px;margin:4px 0 8px}
+.more{margin:-4px 0 16px}
+.more summary{font:600 13px var(--f-body);color:var(--accent);cursor:pointer;padding:4px 0;margin-bottom:8px}
+.acc{margin-top:16px;border:2px solid var(--warn);border-radius:3px;padding:12px 14px;background:var(--panel)}
+.acc-h{font:800 17px var(--f-display);letter-spacing:.06em;text-transform:uppercase;color:var(--warn);margin:0 0 6px}
+.acc p{margin:0 0 6px;font-size:14px}
+.acc ul{margin:0;padding-left:20px;display:grid;gap:3px;font-size:14px}
+.copycur{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin:-4px 0 10px;font-size:13px;color:var(--muted)}
+.copycur .mini{margin-left:0}
+.copycur{flex-wrap:wrap}
+.mdy{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto minmax(0,1.6fr);gap:4px;align-items:center}
+.mdy input{text-align:center;padding:8px 4px}
+.vsrc{margin:0 0 10px;font-size:14.5px;font-weight:700;border-bottom:2px solid var(--line);padding-bottom:8px}
+.mdy span{font-weight:900;color:var(--muted)}
+.copybtns{display:flex;gap:8px;flex-wrap:wrap}
+.xfer{border-top:1px solid var(--line);padding-top:12px;margin-top:4px}
+.xbtns{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.xbtns .mini,.xfer #xLoad{margin-left:0}
+#xBox{width:100%;font:500 12.5px var(--f-num);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:2px;padding:8px;margin-bottom:8px;resize:vertical;word-break:break-all}
+.stamp{font:600 11.5px var(--f-num);letter-spacing:.08em;text-transform:uppercase;color:var(--ink);opacity:.7;margin-top:1px}
+.dt-tag{display:inline-block;margin-top:10px;font:700 12.5px var(--f-body);color:#fff;background:var(--warn);border-radius:2px;padding:3px 8px}
+.legal{margin:8px 0 0;font-size:13px;line-height:1.5;color:var(--muted);max-width:62ch}
+.sign{margin:22px 0 0;font:800 15px var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.gridmsg{margin:0 0 8px;font-size:14px;color:var(--warn);font-weight:600;min-height:0}
+.gridmsg:empty{display:none}
+.days input:disabled{background:transparent;border-style:dashed;color:var(--muted)}
+.daydet{font:500 14px var(--f-num);color:var(--ink);border-left:3px solid var(--accent);padding:2px 10px;margin:0 0 10px;overflow-wrap:anywhere}
+.tabs{display:flex;margin:-6px 0 16px;border-bottom:2px solid var(--line)}
+.tabs button{font:700 15px var(--f-body);font-stretch:90%;letter-spacing:0;background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-2px;padding:10px 16px;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.hourspanel{max-width:620px}
+.tread{font:500 12px var(--f-num);color:var(--accent);min-height:16px}
+.tread.bad{color:var(--warn)}
+.hres .hbig small{display:block;font:500 11.5px var(--f-num);color:var(--muted);margin-top:2px}
+.hres .hsum{display:flex;justify-content:space-between;gap:10px;border-top:2px solid var(--ink);padding-top:8px;font-weight:700}
+.hres .hsum span:last-child{font-family:var(--f-num)}
+.hres{margin:14px 0}
+.hres .hbig{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.hres .hbig div{border:1.5px solid var(--ink);border-radius:3px;padding:8px 10px;background:var(--bg)}
+.hres .hbig span{display:block;font:600 12.5px var(--f-body);color:var(--muted)}
+.hres .hbig b{font:600 24px var(--f-num);font-variant-numeric:tabular-nums}
+.hres .hbig div.pto{border-color:var(--warn)}
+.hres .hbig div.pto b{color:var(--warn)}
+.hres .hbig div.otw{background:var(--plate);border-width:2px}
+.hres .hbig div.otw span{color:var(--ink)}
+.period{border-bottom:2px solid var(--ink);padding:0 0 8px;margin:0 0 12px;font-size:15px}
+.period b{font-weight:700}
+.period small{display:block;color:var(--muted);font-size:13.5px;margin-top:2px}
+.period .q{color:var(--warn);font-weight:600}
+.newper{border:2px solid var(--warn);border-radius:3px;padding:10px 12px;margin:0 0 12px;background:var(--panel)}
+.newper p{margin:0;font-size:14px}
+.days .dn small{display:block;font:500 12.5px var(--f-num);letter-spacing:0;color:var(--muted)}
+.days .dn.today{background:var(--plate);border-radius:2px}
+.days .dn.today small{color:var(--ink)}
+.days input.today{border-color:var(--ink);border-bottom-width:2px}
+.sticky{display:none}
+@media (max-width:760px){
+  h1{font-size:34px}
+  .sticky{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:20;align-items:baseline;gap:10px;background:var(--plate);border-top:2px solid var(--ink);padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));cursor:pointer}
+  .sticky span{font:800 13px var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--ink)}
+  .sticky b{font:600 20px var(--f-num);font-variant-numeric:tabular-nums;color:var(--ink)}
+  .sticky .sg{margin-left:auto}
+  .sticky .sg b{font-size:14px}
+  .wrap{padding-block-end:96px}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+
+/* ---- Cartoon layer: chunky outlines, hard shadows, rounded everything ---- */
+body{font-weight:600}
+h1{font-family:var(--f-body);font-weight:900;text-transform:none;letter-spacing:-.01em;font-size:36px;line-height:1.1;color:var(--ink);text-shadow:none}
+
+header{border-bottom:3px solid var(--edge)}
+.sub{font-weight:700;font-stretch:100%;letter-spacing:0}
+.label{font-family:var(--f-body);font-weight:900;font-stretch:100%;letter-spacing:.08em}
+.panel{border:2.5px solid var(--edge);border-radius:18px;box-shadow:5px 5px 0 var(--shadow-c)}
+.net{border:3px solid var(--edge);border-radius:20px;box-shadow:5px 5px 0 var(--shadow-c);background-position:12px 12px,right 12px top 12px,12px bottom 12px,right 12px bottom 12px;padding:18px 22px 16px}
+.net .big{font-family:var(--f-display);font-weight:400;font-size:48px;letter-spacing:.01em;color:var(--on-plate)}
+.net .cap,.net .stamp,.kpis div,.kpis b{color:var(--on-plate)}
+.net .cap{font-family:var(--f-body);font-weight:900;font-size:13px;letter-spacing:.1em}
+.kpis{border-top:2px dashed var(--on-plate)}
+.kpis b{font-weight:800;font-size:16px}
+.dt-tag{border-radius:999px;border:2px solid var(--on-plate);padding:3px 10px}
+input[type=number],input[type=text],select,#xBox{border:2px solid var(--edge);border-bottom-width:2px;border-radius:10px;background:var(--panel);font-weight:700}
+input:disabled{border-style:dashed}
+input:focus-visible,select:focus-visible,#xBox:focus-visible{outline:3px solid var(--plate);outline-offset:1px;box-shadow:0 0 0 5px var(--accent)}
+button:focus-visible,[role=button]:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.mini,.presets button,.secondary,.primary,.hd{border:2px solid var(--edge);border-radius:12px;box-shadow:2px 2px 0 var(--shadow-c);font-weight:800;transition:transform .08s,box-shadow .08s}
+.mini,.presets button,.secondary{background:var(--panel);color:var(--ink)}
+.mini:hover,.presets button:hover{background:var(--accent-soft);border-color:var(--edge)}
+.primary{background:var(--accent);color:var(--on-accent)}
+.mini:active,.presets button:active,.secondary:active,.primary:active,.hd:active:not(:disabled){transform:translate(2px,2px);box-shadow:0 0 0 var(--shadow-c)}
+.presets button{border-radius:999px}
+.presets button.armed,.mini.armed{background:var(--warn);color:#fff;border-color:var(--edge)}
+.hd{background:var(--panel);color:var(--muted)}
+.hd[aria-pressed="true"]{background:var(--warn);color:#fff;border-color:var(--edge)}
+.hd:disabled:not(.locked){box-shadow:none;opacity:.3}
+.seg{border:2.5px solid var(--edge);border-radius:999px;box-shadow:3px 3px 0 var(--shadow-c);background:var(--panel)}
+.seg button{font-weight:800;padding:9px 16px}
+.seg button+button{border-left:2.5px solid var(--edge)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+.tabs{border-bottom:0;gap:8px;margin:0 0 18px;flex-wrap:wrap}
+.tabs button{border:2.5px solid var(--edge);border-radius:999px;margin:0;padding:7px 13px;white-space:nowrap;font-size:14.5px;background:var(--panel);color:var(--ink);font-weight:800;box-shadow:3px 3px 0 var(--shadow-c)}
+.tabs button[aria-selected="true"]{background:var(--plate);color:var(--on-plate)}
+.days .dn{font-weight:900;border-radius:8px}
+.days .dn.today{background:var(--plate);color:var(--on-plate);border-radius:8px;box-shadow:0 0 0 2px var(--edge)}
+.days .dn.today small{color:var(--on-plate)}
+.days .dn[aria-pressed="true"]:not(.today){color:var(--accent);border-bottom-color:var(--accent)}
+.days input.today{border-color:var(--accent);border-width:3px}
+.days .rl{font-weight:800}
+.wkhead .label{color:var(--ink)}
+.wkt{font-weight:800}
+.setup{border-color:var(--line);border-width:2px 0}
+.setup>summary{font-weight:800}
+.period{border-bottom:3px solid var(--edge);font-weight:700}
+.period .q{color:var(--warn)}
+.acc{border:3px solid var(--warn);border-radius:16px;box-shadow:4px 4px 0 var(--shadow-c)}
+.acc-h{font-family:var(--f-display);font-weight:400;font-size:22px;text-transform:none;letter-spacing:.01em}
+.newper{border:3px solid var(--warn);border-radius:16px;box-shadow:4px 4px 0 var(--shadow-c)}
+.info{border-left-width:4px;border-radius:0 10px 10px 0}
+.daydet{border-left-width:4px;font-weight:700}
+.ib{border-width:2px;font-weight:900}
+.hres .hbig div{border:2.5px solid var(--edge);border-radius:14px;box-shadow:3px 3px 0 var(--shadow-c)}
+.hres .hbig b{font-family:var(--f-display);font-weight:400;font-size:28px}
+.hres .hbig div.otw{background:var(--plate)}
+.hres .hbig div.otw,.hres .hbig div.otw span,.hres .hbig div.otw b,.hres .hbig div.otw small{color:var(--on-plate)}
+.hres .hbig div.pto{background:var(--accent-soft)}
+.hres .hsum{border-top:3px solid var(--edge)}
+.sheet{border:3px solid var(--edge);border-radius:20px;box-shadow:6px 6px 0 var(--shadow-c)}
+.sheet h2{font-family:var(--f-display);font-weight:400;text-transform:none;letter-spacing:.01em}
+tr.tot td{border-top:3px solid var(--edge);font-weight:900}
+td{font-weight:600}
+.sign{font-family:var(--f-display);font-weight:400;text-transform:none;letter-spacing:.02em;font-size:18px}
+.savedtxt{font-weight:800}
+.gridmsg{font-weight:800}
+@media (max-width:760px){
+  h1{font-size:32px}
+  .sticky{background:var(--plate);border-top:3px solid var(--edge)}
+  .sticky span,.sticky b{color:var(--on-plate)}
+  .sticky span{font-family:var(--f-body);font-weight:900}
+}
+@media (prefers-reduced-motion:reduce){.mini,.presets button,.secondary,.primary,.hd{transition:none}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1><span>Paycheck Calculator</span></h1>
+      <p class="sub" id="subLine">Biweekly pay</p>
+    </div>
+    <div class="savebar"><span id="saved" class="savedtxt"></span><button id="reset" class="mini" type="button">Default</button></div>
+    <div class="seg" role="group" aria-label="Whose check">
+      <button id="pMel" aria-pressed="true">Current</button>
+      <button id="pTif" aria-pressed="false">Visualize</button>
+    </div>
+  </header>
+  <nav class="tabs" role="tablist" aria-label="Calculator">
+    <button id="tabPay" role="tab" aria-selected="true" type="button">Paycheck</button>
+    <button id="tabHrs" role="tab" aria-selected="false" type="button">Hours Calculator</button>
+    <button id="tabVac" role="tab" aria-selected="false" type="button">Vacation</button>
+  </nav>
+
+  <div class="grid" id="payTab">
+    <section class="panel">
+      <div class="copycur" id="copyCurRow" hidden><span>Start from your real numbers:</span><span class="copybtns"><button id="copyCur" class="mini" type="button">Copy Current setup</button><button id="copyCurH" class="mini" type="button">Copy Current hours</button></span></div>
+      <details id="setup" class="setup">
+      <summary id="setupSum">Your setup</summary>
+      <p class="label">Pay setup</p>
+      <div class="row">
+        <div class="field"><label for="rate">Hourly rate ($)</label><input id="rate" type="number" step="0.01"></div>
+        <div class="field"><label for="k401">401(k) pre-tax %</label><input id="k401" type="number" step="0.5"></div>
+        <div class="field"><label for="k401r">401(k) Roth %</label><input id="k401r" type="number" step="0.5" min="0" placeholder="0"></div>
+        <div class="field"><label for="k401a">401(k) after-tax %</label><input id="k401a" type="number" step="0.5" min="0" placeholder="0"></div>
+        <div class="field"><label for="extra">W-4 extra ($)</label><input id="extra" type="number" step="5"></div>
+        <div class="field"><label for="loan">401(k) loan ($)</label><input id="loan" type="number" step="0.01"></div>
+        <div class="field"><label for="fs">Filing status</label><select id="fs"><option value="mfj">Married jointly</option><option value="single">Single</option><option value="hoh">Head of household</option></select></div>
+      </div>
+
+      <p class="label">Deductions</p>
+      <div class="row">
+        <div class="field"><label for="med">Medical per check ($)</label><input id="med" type="number" step="0.01" min="0"></div>
+        <div class="field"><label for="duesAmt">Union dues per month ($)</label><input id="duesAmt" type="number" step="0.01" min="0"></div>
+        <div class="field"><label for="mnpl">MNPL per month ($)</label><input id="mnpl" type="number" step="0.01" min="0"></div>
+        <div class="field"><label for="ytd">Year-to-date gross ($)</label><input id="ytd" type="number" step="1" min="0" placeholder="0"></div>
+      </div>
+      <p class="hint">Year-to-date gross is the YTD gross on your last stub, before this check. It stops Social Security at $184,500 for the year and adds the extra 0.9% Medicare over $200,000. Leave it blank if you're unsure.</p>
+      <details id="more" class="more">
+        <summary>More deductions (optional)</summary>
+        <div class="row">
+          <div class="field"><label for="credit">W-4 dependents credit ($ per year)</label><input id="credit" type="number" step="100" min="0" placeholder="0"></div>
+          <div class="field"><label for="oPre">Other before-tax ($ per check)</label><input id="oPre" type="number" step="0.01" min="0" placeholder="0"></div>
+          <div class="field"><label for="espp">Stock purchase plan (%)</label><input id="espp" type="number" step="0.5" min="0" max="100" placeholder="0"></div>
+          <div class="field"><label for="oPost">Other after-tax ($ per check)</label><input id="oPost" type="number" step="0.01" min="0" placeholder="0"></div>
+        </div>
+        <label class="check"><input type="checkbox" id="step2"> <span>W-4 Step 2 is checked</span></label>
+      </details>
+      <div class="xfer">
+        <p class="label">Move your setup to another device</p>
+        <div class="xbtns"><button id="xCopy" class="mini" type="button">Copy my setup</button><button id="xLoadOpen" class="mini" type="button">Load setup</button></div>
+        <textarea id="xBox" rows="3" hidden spellcheck="false" autocomplete="off" placeholder="Paste your setup code here"></textarea>
+        <button id="xLoad" class="mini" type="button" hidden>Load this code</button>
+        <p class="hint" id="xMsg"></p>
+      </div>
+      </details>
+
+      <div class="newper" id="newper" hidden>
+        <p id="npText"></p>
+        <div class="btns"><button id="npKeep" class="secondary" type="button">Keep hours</button><button id="npClear" class="primary" type="button">Start new period</button></div>
+      </div>
+      <div class="period" id="period" hidden></div>
+      <div class="wkhead"><p class="label">Week 1</p><span id="wk1t" class="wkt"></span><button id="clearH" class="mini" type="button">Clear hours</button></div>
+      <div class="days" id="days1"></div>
+      <p class="daydet" id="dd1" hidden></p>
+      <div class="wkhead"><p class="label">Week 2</p><span id="wk2t" class="wkt"></span><button id="copy" class="mini" type="button">Copy week 1</button></div>
+      <div class="days" id="days2"></div>
+      <p class="daydet" id="dd2" hidden></p>
+      <p class="gridmsg" id="gridMsg" role="status"></p>
+      <p class="hint">Regular = straight-time hours, up to 8 a day (less any PTO). Anything past that goes in OT. Saturday, Sunday and holidays are all OT. A holiday that falls on a weekend pays normal weekend rates; its 8 holiday hours are paid on the weekday the union calendar lists. PTO counts toward the day's first 8 hours. Tap H for a holiday. Tap a day name to see its pay.</p>
+      <div class="presets" id="presets">
+        <button data-p="40">40 hrs, no OT</button>
+        <button data-p="10">10-hr weekdays</button>
+        <button data-p="12">12-hr weekdays</button>
+        <button data-p="10s">10-hr + Saturday</button>
+        <button data-p="10ss">10-hr + Sat + Sun</button>
+      </div>
+
+      <div id="legacy" hidden>
+        <p class="label">Older entries</p>
+        <div class="row">
+          <div class="field"><label for="leave">Sick / vacation (hrs)</label><input id="leave" type="number" step="1" value="0"></div>
+          <div class="field"><label for="hol">Holidays this check</label><input id="hol" type="number" step="1" min="0" value="0"></div>
+          <div class="field"><label for="holw">Hours worked on holidays</label><input id="holw" type="number" step="0.5" min="0" value="0"></div>
+        </div>
+        <p class="hint">These are totals you saved before PTO and holidays moved to each day. They still count. Set them to 0 once you've entered those days above.</p>
+      </div>
+
+      <p class="label">This check</p>
+      <label class="check" id="duesRow"><input type="checkbox" id="dues" checked> <span>Union dues + MNPL come out this check (every other check)</span></label>
+      <p class="hint" id="duesAuto" hidden></p>
+      <div class="row"><div class="field"><label for="q160h">Quarter OT before this pay period</label><input id="q160h" type="number" step="0.5" min="0" placeholder="0"></div></div>
+    </section>
+
+    <section class="panel" aria-live="polite">
+      <div class="net">
+        <div class="cap" id="netCap">Mel · take-home this check</div>
+        <div class="stamp" id="plateStamp"></div>
+        <div class="big" id="net">$0</div>
+        <div class="kpis">
+          <div>Gross<b id="kGross">$0</b></div>
+          <div>2-check month<b id="kMonth">$0</b></div>
+          <div>Yearly (26)<b id="kYear">$0</b></div>
+        </div>
+        <div class="dt-tag" id="dtTag" hidden>Past 160 hours: overtime is all double time</div>
+      </div>
+
+      <p class="label sec">Earnings</p>
+      <table id="earn"></table>
+      <p class="label sec">Deductions</p>
+      <table id="ded"></table>
+      <div class="acc">
+        <p class="acc-h">How accurate is this?</p>
+        <p>Usually within <b>about $10</b> of your paystub when your setup matches your stub.</p>
+        <p>It can be off by more on a check with:</p>
+        <ul>
+          <li>A raise partway through the pay period</li>
+          <li>Back pay, adjustments or a bonus</li>
+          <li>A shift premium not included in your rate (2nd shift +$1.25, 3rd shift +$0.30)</li>
+          <li>Late in the year, after you reach the yearly 401(k) limit</li>
+        </ul>
+      </div>
+      <p class="note" id="note"></p>
+    </section>
+  </div>
+
+  <section class="panel hourspanel" id="hoursTab" hidden>
+    <details class="setup" id="shiftBox">
+      <summary id="shiftSum">Shift</summary>
+      <div class="row">
+        <div class="field"><label for="hsS">Shift start</label><input id="hsS" type="text" inputmode="numeric" autocomplete="off" placeholder="600"><small class="tread" id="hsSR"></small></div>
+        <div class="field"><label for="hsE">Shift end</label><input id="hsE" type="text" inputmode="numeric" autocomplete="off" placeholder="230"><small class="tread" id="hsER"></small></div>
+        <div class="field"><label for="hsL">Lunch (min)</label><input id="hsL" type="number" step="5" min="0"></div>
+      </div>
+    </details>
+    <div class="row">
+      <div class="field"><label for="hDay">Day</label><select id="hDay"></select></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="hIn">Clock in</label><input id="hIn" type="text" inputmode="numeric" autocomplete="off" placeholder="746"><small class="tread" id="hInR"></small></div>
+      <div class="field"><label for="hOut">Clock out</label><input id="hOut" type="text" inputmode="numeric" autocomplete="off" placeholder="437"><small class="tread" id="hOutR"></small></div>
+    </div>
+    <label class="check"><input type="checkbox" id="hLunch"> <span>Claimed lunch</span></label>
+    <label class="check"><input type="checkbox" id="hHol"> <span>Holiday</span></label>
+    <div class="hres" id="hRes"></div>
+    <button id="hAdd" class="primary" type="button">Put on day</button>
+    <p class="hint" id="hMsg" style="margin-top:10px"></p>
+    <p class="hint">Type times as numbers: 746 is 7:46, 437 is 4:37. AM or PM is worked out from your shift; type 1637 if it guesses wrong. Minutes convert to tenths of an hour the same way most timekeeping systems do (tenths of an hour).</p>
+  </section>
+  <section class="panel hourspanel" id="vacTab" hidden>
+    <p class="label">Your vacation info</p>
+    <div class="row">
+      <div class="field"><label for="senM">Seniority date</label><div class="mdy"><input id="senM" type="text" inputmode="numeric" maxlength="2" autocomplete="off" placeholder="MM" aria-label="Seniority month"><span>/</span><input id="senD" type="text" inputmode="numeric" maxlength="2" autocomplete="off" placeholder="DD" aria-label="Seniority day"><span>/</span><input id="senY" type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="YYYY" aria-label="Seniority year"></div><small class="tread" id="senR"></small></div>
+      <div class="field"><label for="sickE">Sick leave earned this year (hrs)</label><input id="sickE" type="number" step="0.1" min="0" placeholder="0"></div>
+      <div class="field"><label for="vacBal">Vacation balance now (hrs)</label><input id="vacBal" type="number" step="0.1" min="0" placeholder="0"></div>
+    </div>
+    <label class="check"><input type="checkbox" id="shift3"> <span>I work 3rd shift</span></label>
+    <div class="hres" id="vRes"></div>
+    <p class="hint">Uses the hours on your Paycheck tab for this pay period. Every paid hour counts once (overtime counts as a regular hour), including PTO and holiday pay. Credit goes to sick leave first until you've earned 40 hours for the year, then to vacation.</p>
+  </section>
+  <p class="sign">Built on the line, for the line.</p>
+  <p class="legal">Estimate only. Your paystub and timekeeping records are the official numbers. Not affiliated with, or endorsed by, any employer or union. Not tax, legal or financial advice. Provided as-is, with no guarantee of accuracy. Your numbers stay on your device; nothing is sent anywhere.</p>
+</div>
+
+<div id="sticky" class="sticky" role="button" tabindex="0" aria-label="Show pay breakdown"><span>Take-home</span><b id="sNet">$0</b><span class="sg">Gross <b id="sGross">$0</b></span></div>
+
+<div id="ackBox" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="ackTitle">
+  <div class="sheet">
+    <p class="label">Before you start</p>
+    <h2 id="ackTitle">This is an estimate</h2>
+    <ul>
+      <li>It estimates your paycheck. Your paystub and timekeeping records are the official numbers.</li>
+      <li>It's a free personal tool. It isn't made by, affiliated with, or endorsed by any employer or union.</li>
+      <li>It isn't tax, legal or financial advice, and it comes with no guarantee of accuracy.</li>
+      <li>Everything you enter stays on this device. Nothing is sent anywhere.</li>
+    </ul>
+    <button id="ackOk" class="primary" type="button">I understand</button>
+  </div>
+</div>
+
+<div id="whatsnew" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="wnTitle">
+  <div class="sheet">
+    <p class="label">What's new</p>
+    <h2 id="wnTitle">Calculator updates</h2>
+    <ul id="wnList"></ul>
+    <p class="hint">Your saved numbers weren't changed.</p>
+    <button id="wnOk" class="primary" type="button">Got it</button>
+  </div>
+</div>
+
+<div id="defBox" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="defTitle">
+  <div class="sheet">
+    <p class="label" id="defStep">Step 1 of 2</p>
+    <h2 id="defTitle">Reset to default?</h2>
+    <p id="defMsg"></p>
+    <div class="btns"><button id="defCancel" class="secondary" type="button">Cancel</button><button id="defGo" class="primary" type="button">Continue</button></div>
+  </div>
+</div>
+
+<script>
+const PEOPLE={
+  mel:{name:"Current",rate:45.02,k401:8.5,extra:150,loan:47.39,fs:"mfj",med:25.59,duesAmt:111.70,mnpl:7.51,ytd:""},
+  tif:{name:"Visualize",rate:"",k401:"",extra:0,loan:0,fs:"mfj",med:25.59,duesAmt:111.70,mnpl:7.51,ytd:""}
+};
+const DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const PRESETS={"40":[8,8,8,8,8,0,0],"10":[10,10,10,10,10,0,0],"12":[12,12,12,12,12,0,0],"10s":[10,10,10,10,10,10,0],"10ss":[10,10,10,10,10,10,10]};
+const MED=25.59, DUES=111.70, MNPL=7.51, PFML=0.00807, LTC=0.0058, LNI=0.08, SSB=184500;
+const num=(v,d)=>(v===""||v==null||isNaN(+v))?d:+v;
+// 2026 federal withholding: annualize, subtract standard deduction, apply brackets, divide by 26
+const TAX={mfj:{std:32200,b:[24800,100800,211400,403550,512450,768700]},single:{std:16100,b:[12400,50400,105700,201775,256225,640600]},hoh:{std:24150,b:[17700,67450,105700,201750,256200,640600]}};
+const RATES=[.10,.12,.22,.24,.32,.35,.37];
+const FSN={mfj:"Married jointly",single:"Single",hoh:"Head of household"};
+// Union pay calendar, Sep 2026 – Aug 2027 (update when the next calendar is published)
+const PAYDATES=["2026-09-03","2026-09-17","2026-10-01","2026-10-15","2026-10-29","2026-11-12","2026-11-25","2026-12-10","2026-12-24","2027-01-07","2027-01-21","2027-02-04","2027-02-18","2027-03-04","2027-03-18","2027-04-01","2027-04-15","2027-04-29","2027-05-13","2027-05-27","2027-06-10","2027-06-24","2027-07-08","2027-07-22","2027-08-05","2027-08-19"];
+const HOLIDAYS=new Set(["2026-09-07","2026-11-26","2026-11-27","2026-12-24","2026-12-25","2026-12-28","2026-12-29","2026-12-30","2026-12-31","2027-01-01","2027-05-31","2027-07-05"]);
+const QENDS=["2026-09-24","2026-12-17","2027-03-25","2027-06-24"];
+const CARD_END="2027-08-26";
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"], MONL=["January","February","March","April","May","June","July","August","September","October","November","December"], WD=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const ANCHOR=new Date(2026,8,25); // Fri Sep 25, 2026 starts a pay period (Oct 15 check)
+const addD=(d,n)=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);
+const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const dayN=d=>Math.round(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5);
+const fmtD=d=>`${WD[d.getDay()]} ${MON[d.getMonth()]} ${d.getDate()}`;
+// Payday for period n: from the card if listed, else the Thursday a week after the period ends
+function payFor(n){const end=addD(ANCHOR,14*n+13);const lo=dayN(end)+1,hi=dayN(end)+7;const hit=PAYDATES.find(s=>{const [y,m,d]=s.split("-").map(Number);const x=dayN(new Date(y,m-1,d));return x>=lo&&x<=hi;});if(hit){const [y,m,d]=hit.split("-").map(Number);return {d:new Date(y,m-1,d),est:false};}return {d:addD(end,7),est:true};}
+function calFor(today){
+  const n=Math.floor((dayN(today)-dayN(ANCHOR))/14), start=addD(ANCHOR,14*n), end=addD(start,13);
+  const pay=payFor(n), pm=pay.d.getMonth(), py=pay.d.getFullYear();
+  let rank=1; for(let j=n-1;j>=n-3;j--){const p=payFor(j).d;if(p.getMonth()===pm&&p.getFullYear()===py)rank++;}
+  const dates=[]; for(const w of [0,7]) ORDER.forEach((i,j)=>{dates[w+i]=ymd(addD(start,w+j));});
+  let qOff=null; QENDS.forEach(q=>{const [y,m,d]=q.split("-").map(Number);const o=dayN(new Date(y,m-1,d))-dayN(start);if(o>=0&&o<13)qOff=o;});
+  return {id:ymd(start),start,end,pay:pay.d,est:pay.est,rank,month:MONL[pm],dates,todayYmd:ymd(today),qOff,qEndD:qOff===null?null:addD(start,qOff),
+    pastCard:ymd(end)>CARD_END,duesOn:rank===1,mnplOn:rank===2,medOn:rank<3};
+}
+let CAL=null;
+function fedWH(ftg,fs,credit,step2){let t=TAX[fs]||TAX.mfj;if(step2)t={std:t.std/2,b:t.b.map(x=>x/2)};const x=Math.max(0,ftg*26-t.std);let tax=0,lo=0;for(let i=0;i<RATES.length;i++){const hi=i<t.b.length?t.b[i]:Infinity;if(x>lo)tax+=(Math.min(x,hi)-lo)*RATES[i];lo=hi;}return Math.max(0,tax-(credit||0))/26;}
+let who="mel";
+const DEF=[10,10,10,10,10,0,0,10,10,10,10,10,0,0];
+const state={mel:{...PEOPLE.mel,hours:DEF.slice()},tif:{...PEOPLE.tif,hours:DEF.slice()}};
+const $=id=>document.getElementById(id);
+const money=v=>(v<0?"−":"")+"$"+Math.abs(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+
+// Day grid: index k = (week-1)*7 + Mon-based day; shown Fri → Thu
+const ORDER=[4,5,6,0,1,2,3];
+let selDay=null;
+[1,2].forEach(wk=>{
+  const el=$("days"+wk), o=(wk-1)*7;
+  let html='<span class="rl"></span>';
+  ORDER.forEach(i=>html+=`<button type="button" class="dn${i>4?" we":""}" id="dn${o+i}" aria-pressed="false" aria-label="Week ${wk} ${DAYS[i]} pay breakdown">${DAYS[i]}</button>`);
+  html+='<span class="rl">Regular</span>';
+  ORDER.forEach(i=>html+=`<input type="number" id="h${o+i}" min="0" max="8" step="0.5" aria-label="Week ${wk} ${DAYS[i]} hours worked">`);
+  html+='<span class="rl">OT</span>';
+  ORDER.forEach(i=>html+=`<input type="number" class="ot" id="o${o+i}" min="0" max="16" step="0.5" placeholder="0" aria-label="Week ${wk} ${DAYS[i]} overtime hours">`);
+  html+='<span class="rl">PTO</span>';
+  ORDER.forEach(i=>html+=`<input type="number" class="pto" id="p${o+i}" min="0" max="12" step="0.5" placeholder="0" aria-label="Week ${wk} ${DAYS[i]} PTO hours">`);
+  html+='<span class="rl">Holiday</span>';
+  ORDER.forEach(i=>html+=`<button type="button" class="hd" id="hd${o+i}" aria-pressed="false" aria-label="Week ${wk} ${DAYS[i]} holiday">H</button>`);
+  el.innerHTML=html;
+});
+
+// One day under the union rules. i = 0 Mon … 4 Fri, 5 Sat, 6 Sun.
+// Weekday: PTO + worked fill the first 8 at 1×, next 2 at 1.5×, rest 2×.
+// Holiday: 8 hrs holiday pay at 1× + every worked hour at 2×.
+function dayPay(i,h,p,hol){
+  h=Math.max(0,+h||0); p=Math.max(0,+p||0);
+  const d={st:0,pto:p,ot:0,dt:0,holH:0,holW:0,worked:h};
+  if(hol&&i<5){d.holH=8;d.holW=h;}   // a holiday on Sat/Sun pays normal weekend rates, no holiday pay
+  else if(i<5){const s=Math.min(h,Math.max(0,8-p));d.st=s;const rem=h-s;d.ot=Math.min(rem,2);d.dt=Math.max(rem-2,0);}
+  else if(i===5){d.ot=Math.min(h,8);d.dt=Math.max(h-8,0);}
+  else d.dt=h;
+  return d;
+}
+
+// Pure calculation: per-day union rules, two separate weeks
+function calc(p){
+  const cal=(p===state.mel)?CAL:null; // pay calendar applies to the Current profile only
+  let st=0,pto=0,ot=0,dt=0,holH=0,holW=0,worked=0;
+  const P=p.pto||[], H=p.holD||[];
+  // 160-hr rule, day by day in pay-period order (Fri → Thu, week 1 then week 2).
+  // All OT counts toward 160 (holidays too); 1.5× hours past 160 become 2×.
+  let cum=Math.max(0,p.q160h!==undefined?num(p.q160h,0):(p.q160?160:0)); const q0=cum; const days=[]; let qReset=false, qAt=0;
+  for(const w of [0,7]) for(const i of ORDER){
+    const k=w+i, d=dayPay(i,(+p.hours[k]||0)+(+(p.otD||[])[k]||0),P[k],H[k]);
+    // Budget quarter ends inside this period: the count restarts at 0 the day after
+    if(cal&&cal.qOff!==null&&!qReset&&w+ORDER.indexOf(i)>cal.qOff){qAt=cum;cum=0;qReset=true;}
+    const keep=Math.min(d.ot,Math.max(0,160-cum)); d.dt+=d.ot-keep; d.ot=keep; cum+=d.ot+d.dt+d.holW;
+    days[k]=d; st+=d.st;pto+=d.pto;ot+=d.ot;dt+=d.dt;holH+=d.holH;holW+=d.holW;worked+=d.worked;
+  }
+  const qEnd=cum;
+  // Older pay-period totals (saved before per-day boxes) still count
+  const leave=Math.max(0,+p.leave||0);
+  holH+=Math.max(0,Math.floor(+p.hol||0))*8;
+  const legW=Math.max(0,+p.holw||0); holW+=legW; worked+=legW;
+  const r=+p.rate||0;
+  const stPay=(st+pto+leave+holH)*r, otPay=ot*r*1.5, dtPay=dt*r*2;
+  const holPay=holW*r*2;
+  const gross=stPay+otPay+dtPay+holPay;
+  const k=stPay*(+p.k401||0)/100;                       // pre-tax 401(k): lowers federal taxable pay
+  const kR=stPay*Math.max(0,num(p.k401r,0))/100;        // Roth 401(k): after tax
+  const kA=stPay*Math.max(0,num(p.k401a,0))/100;        // after-tax 401(k)
+  const oPre=Math.max(0,num(p.oPre,0)), oPost=Math.max(0,num(p.oPost,0)), credit=Math.max(0,num(p.credit,0));
+  const esppPct=Math.min(100,Math.max(0,num(p.espp,0))), espp=stPay*esppPct/100;
+  const med=((cal&&!cal.medOn)?0:Math.max(0,num(p.med,0)))+oPre;
+  const ftg=gross-med-k;
+  const fedBase=fedWH(ftg,p.fs,credit,!!p.step2);
+  const fed=fedBase+(+p.extra||0);
+  // Year-to-date limits: Social Security and WA Paid Leave stop at $184,500; extra 0.9% Medicare over $200,000
+  const ytd=Math.max(0,num(p.ytd,0)), fw=gross-med, room=Math.max(0,SSB-ytd);
+  const ss=0.062*Math.min(fw,room);
+  const mcAdd=0.009*(Math.max(0,ytd+fw-200000)-Math.max(0,ytd-200000));
+  const mc=0.0145*fw+mcAdd;
+  const fica=ss+mc;
+  const pfml=PFML*Math.min(gross,room), ltc=gross*LTC, lni=worked*LNI;
+  const duesM=Math.max(0,num(p.duesAmt,0)), mnplM=Math.max(0,num(p.mnpl,0));
+  const dues=cal?((cal.duesOn?duesM:0)+(cal.mnplOn?mnplM:0)):(p.dues?duesM+mnplM:0);
+  const loan=+p.loan||0;
+  const net=gross-med-k-fed-fica-pfml-ltc-lni-dues-loan-oPost-espp-kR-kA;
+  return {kR,kA,cal,qReset,qAt,espp,esppPct,days,q0,qEnd,oPre,oPost,credit,st,pto,ot,dt,leave,holH,holW,holPay,worked,r,stPay,otPay,dtPay,gross,k,ftg,fedBase,fed,med,ytd,room,ss,mc,mcAdd,fica,pfml,ltc,lni,duesM,mnplM,dues,loan,net};
+}
+
+function read(){
+  const s=state[who];
+  s.step2=$("step2").checked; s.q160h=$("q160h").value;
+  {const m=$("senM").value.replace(/\D/g,""),d=$("senD").value.replace(/\D/g,""),y=$("senY").value.replace(/\D/g,"");s.senDate=(m||d||y)?`${m}/${d}/${y}`:"";} s.sickE=$("sickE").value; s.vacBal=$("vacBal").value; s.shift3=$("shift3").checked;
+  s.hsS=$("hsS").value; s.hsE=$("hsE").value; s.hsL=$("hsL").value; s.hIn=$("hIn").value; s.hOut=$("hOut").value; s.hClaim=$("hLunch").checked; s.hHol=$("hHol").checked;
+  if($("hDay").value!=="")s.hDay=+$("hDay").value;
+  s.espp=$("espp").value; s.k401r=$("k401r").value; s.k401a=$("k401a").value;
+  s.credit=$("credit").value; s.oPre=$("oPre").value; s.oPost=$("oPost").value;
+  s.med=$("med").value; s.duesAmt=$("duesAmt").value; s.mnpl=$("mnpl").value; s.ytd=$("ytd").value;
+  s.fs=$("fs").value; s.rate=$("rate").value; s.k401=$("k401").value; s.extra=$("extra").value; s.loan=$("loan").value;
+  s.hours=DEF.map((_,i)=>+$("h"+i).value||0);
+  s.otD=DEF.map((_,i)=>+$("o"+i).value||0);
+  s.pto=DEF.map((_,i)=>+$("p"+i).value||0);
+  s.holD=DEF.map((_,i)=>$("hd"+i).getAttribute("aria-pressed")==="true");
+  s.leave=$("leave").value; s.hol=$("hol").value; s.holw=$("holw").value; s.dues=$("dues").checked;
+}
+function write(){
+  const s=state[who];
+  $("credit").value=s.credit||""; $("oPre").value=s.oPre||""; $("oPost").value=s.oPost||"";
+  $("setup").open=!(+s.rate>0);
+  buildDayOpts();
+  if(s.hDay==null){let t=0;if(who==="mel"&&CAL){const f=DEF.findIndex((_,k)=>CAL.dates[k]===CAL.todayYmd);if(f>=0)t=f;}else t=4;s.hDay=t;}
+  {const pt=String(s.senDate||"").split(/[\/\-.]/);$("senM").value=pt[0]||"";$("senD").value=pt[1]||"";$("senY").value=pt[2]||"";} $("sickE").value=s.sickE??""; $("vacBal").value=s.vacBal??""; $("shift3").checked=!!s.shift3;
+  $("hDay").value=s.hDay; $("hsS").value=s.hsS||"6:00"; $("hsE").value=s.hsE||"2:30"; $("hsL").value=s.hsL??30;
+  $("hIn").value=s.hIn||""; $("hOut").value=s.hOut||""; $("hLunch").checked=!!s.hClaim; $("hHol").checked=!!s.hHol;
+  $("step2").checked=!!s.step2; $("q160h").value=s.q160h??(s.q160?160:"");
+  $("espp").value=s.espp||""; $("k401r").value=s.k401r||""; $("k401a").value=s.k401a||"";
+  $("more").open=!!((+s.credit||0)||(+s.oPre||0)||(+s.oPost||0)||s.step2||(+s.espp||0));
+  $("med").value=s.med??MED; $("duesAmt").value=s.duesAmt??DUES; $("mnpl").value=s.mnpl??MNPL; $("ytd").value=s.ytd??"";
+  $("fs").value=s.fs||"mfj"; $("rate").value=s.rate; $("k401").value=s.k401; $("extra").value=s.extra; $("loan").value=s.loan;
+  s.hours.forEach((h,i)=>$("h"+i).value=h);
+  DEF.forEach((_,i)=>{const v=(s.otD||[])[i];$("o"+i).value=v?v:"";});
+  DEF.forEach((_,i)=>{const v=(s.pto||[])[i];$("p"+i).value=v?v:"";$("hd"+i).setAttribute("aria-pressed",!!(s.holD||[])[i]);});
+  $("leave").value=s.leave??0; $("hol").value=s.hol??0; $("holw").value=s.holw??0;
+  $("legacy").hidden=!((+s.leave||0)||(+s.hol||0)||(+s.holw||0));
+  $("dues").checked=s.dues??true;
+}
+function dayText(k,s){
+  const hol=!!(s.holD||[])[k], d=calc(s).days[k], r=+s.rate||0, q=1.5;
+  const parts=[];
+  if(d.holH)parts.push(`8 holiday at 1×`);
+  if(d.pto)parts.push(`${d.pto} PTO at 1×`);
+  if(d.st)parts.push(`${d.st} at 1×`);
+  if(d.ot)parts.push(`${d.ot} at ${q}×`);
+  if(d.dt)parts.push(`${d.dt} at 2×`);
+  if(d.holW)parts.push(`${d.holW} worked at 2×`);
+  const pay=(d.holH+d.pto+d.st)*r+d.ot*r*q+(d.dt+d.holW)*r*2;
+  return `${DAYS[k%7]}${hol?" (holiday)":""}: ${parts.length?parts.join(" + ")+" = "+money(pay):"no hours"}`;
+}
+function row(label,sub,val){return `<tr><td>${label}${sub?`<small>${sub}</small>`:""}</td><td class="n">${val}</td></tr>`;}
+function renderCal(s){
+  const on=who==="mel"&&CAL;
+  DEF.forEach((_,k)=>{
+    const b=$("dn"+k), i=k%7, isToday=on&&CAL.dates[k]===CAL.todayYmd;
+    if(on){const dd=+CAL.dates[k].slice(8);b.innerHTML=`${DAYS[i]}<small>${dd}</small>`;}else b.textContent=DAYS[i];
+    b.classList.toggle("today",!!isToday); $("h"+k).classList.toggle("today",!!isToday); $("o"+k).classList.toggle("today",!!isToday);
+    const lock=!!(on&&HOLIDAYS.has(CAL.dates[k])), hb=$("hd"+k);
+    hb.disabled=lock; hb.classList.toggle("locked",lock); hb.title=lock?"Union holiday":"";
+    if(i>=5){hb.disabled=true;hb.classList.remove("locked");hb.setAttribute("aria-pressed","false");hb.title="Weekend: normal weekend rates, no holiday pay";}
+    if(lock)hb.setAttribute("aria-pressed","true");
+  });
+  $("period").hidden=!on; $("duesRow").hidden=!!on; $("duesAuto").hidden=!on;
+  $("newper").hidden=!(on&&s.periodId!==CAL.id);
+  if(!on){$("subLine").textContent="Biweekly pay";return;}
+  const ord=["1st","2nd","3rd"][CAL.rank-1]||CAL.rank+"th";
+  const dLeft=dayN(CAL.pay)-dayN(new Date());
+  $("subLine").textContent=dLeft<=0?`Payday today · ${fmtD(CAL.pay)}`:dLeft===1?`Payday tomorrow · ${fmtD(CAL.pay)}`:`Payday in ${dLeft} days · ${fmtD(CAL.pay)}`;
+  $("period").innerHTML=`Pay period <b>${fmtD(CAL.start)} – ${fmtD(CAL.end)}</b> · paid <b>${fmtD(CAL.pay)}</b>${CAL.est?" (estimated)":""}`+
+    `<small>${ord} check in ${CAL.month}${CAL.qEndD?` · <span class="q">Budget quarter ends ${fmtD(CAL.qEndD)}: overtime after that starts the new quarter at 0</span>`:""}${CAL.pastCard?" · Past the union card: holidays aren't marked automatically":""}</small>`;
+  $("duesAuto").textContent=(CAL.rank===1?`${fmtD(CAL.pay)} is the 1st check in ${CAL.month}: union dues come out, MNPL doesn't.`:CAL.rank===2?`${fmtD(CAL.pay)} is the 2nd check in ${CAL.month}: MNPL comes out, union dues don't.`:`${fmtD(CAL.pay)} is the ${ord} check in ${CAL.month}: no union dues, MNPL or medical.`)+" ⚠ Based on a few stubs, not yet confirmed.";
+  if(s.periodId!==CAL.id){
+    const [y,m,d]=s.periodId.split("-").map(Number), os=new Date(y,m-1,d);
+    $("npText").textContent=`New pay period, clean slate. It started (${fmtD(CAL.start)} – ${fmtD(CAL.end)}). The hours below are from ${fmtD(os)} – ${fmtD(addD(os,13))}.`;
+  }
+}
+// ---- Hours calculator tab ----
+function dayLabel(k){const i=k%7;if(who==="mel"&&CAL){const [y,m,d]=CAL.dates[k].split("-").map(Number);return fmtD(new Date(y,m-1,d));}return `Week ${k<7?1:2} ${DAYS[i]}`;}
+function buildDayOpts(){
+  const sel=$("hDay"), keep=sel.value; let html="";
+  for(const w of [0,7]) for(const i of ORDER){const k=w+i;html+=`<option value="${k}">${dayLabel(k)}</option>`;}
+  if(sel.innerHTML!==html){sel.innerHTML=html; if(keep!=="")sel.value=keep;}
+}
+// Times typed as numbers: 746 = 7:46, 1637 = 4:37 PM. AM/PM is worked out from the shift.
+const fmt12=m=>{m=((m%1440)+1440)%1440;const h=Math.floor(m/60),mm=String(m%60).padStart(2,"0");return `${h%12||12}:${mm} ${h<12?"AM":"PM"}`;};
+function parseT(v,o={}){
+  if(v==null)return null; const str=String(v).trim().toLowerCase(); if(!str)return null;
+  const ap=/p/.test(str)?"p":/a/.test(str)?"a":"", dg=str.replace(/\D/g,"");
+  if(!dg||dg.length>4)return null;
+  let h,m; if(dg.length<=2){h=+dg;m=0;}else{h=+dg.slice(0,-2);m=+dg.slice(-2);}
+  if(h>23||m>59)return null;
+  if(ap){if(h<1||h>12)return null;return ((h%12)+(ap==="p"?12:0))*60+m;}
+  if(h===0||h>=13||dg.length===4&&dg[0]==="0")return h*60+m;   // 24-hour time
+  const am=(h%12)*60+m, pm=am+720;
+  if(o.after!=null){const g=x=>((x-o.after)%1440+1440)%1440||1440;return g(am)<=g(pm)?am:pm;}  // first one after
+  if(o.near!=null){const d=x=>{const z=Math.abs(x-o.near)%1440;return Math.min(z,1440-z);};return d(am)<=d(pm)?am:pm;}
+  return am;
+}
+// Tenths-of-an-hour timekeeping table:
+// hours worked: 0-2 min = 0, 3-8 = .1, 9-14 = .2 ... 57-60 = 1
+// hours of absence (PTO): 0-3 min = 0, 4-9 = .1, 10-15 = .2 ... 58-60 = 1
+const rWork=m=>Math.floor((Math.round(m)+3)/6)/10;
+const rAbs=m=>Math.floor((Math.round(m)+2)/6)/10;
+const r10=rWork;
+const hm=m=>`${Math.floor(m/60)}:${String(Math.round(m%60)).padStart(2,"0")}`;
+function hoursCalc(s){
+  const k=s.hDay??0, i=k%7, hol=!!s.hHol;
+  const S0=parseT(s.hsS||"600"), E0=parseT(s.hsE||"230",{after:S0});
+  const I0=parseT(s.hIn,{near:S0}), O0=parseT(s.hOut,{after:I0});
+  if(I0===null||O0===null)return null;
+  let S=S0,E=E0,I=I0,O=O0;
+  if(S!==null&&E!==null&&E<=S)E+=1440;     // shift crosses midnight
+  if(O<=I)O+=1440;                           // clocked out after midnight
+  if(S!==null&&E>1440&&I<S-360){I+=1440;O+=1440;}
+  // Claimed lunch = worked through lunch, so the lunch time is paid (it lands as overtime). Not claimed = unpaid lunch taken out.
+  const shiftL=Math.max(0,num(s.hsL,30)), L=s.hClaim?0:shiftL;
+  const workedM=Math.max(0,O-I-L);
+  let ptoM=0;
+  if(i<5&&!hol&&S!==null&&E!==null){
+    const late=Math.max(0,Math.min(I,E)-S), early=Math.max(0,E-Math.max(O,S));
+    ptoM=Math.min(late+early,Math.max(0,E-S-shiftL));
+  }
+  const w=rWork(workedM), p=rAbs(ptoM), d=dayPay(i,w,p,hol);
+  return {k,i,hol,workedM,ptoM,w,p,d};
+}
+function renderHours(s){
+  buildDayOpts();
+  const wkd=(s.hDay??0)%7>=5; $("hHol").disabled=wkd; if(wkd){$("hHol").checked=false;s.hHol=false;}
+  const S0=parseT(s.hsS||"600"), E0=parseT(s.hsE||"230",{after:S0}), I0=parseT(s.hIn,{near:S0}), O0=parseT(s.hOut,{after:I0}), L=Math.max(0,num(s.hsL,30));
+  const tr=(id,raw,val)=>{const el=$(id);el.classList.toggle("bad",!!raw&&val===null);el.textContent=raw?(val===null?"Type it like 746 or 1637":fmt12(val)):"";};
+  tr("hsSR",s.hsS,S0); tr("hsER",s.hsE,E0); tr("hInR",s.hIn,I0); tr("hOutR",s.hOut,O0);
+  $("shiftSum").textContent=(S0!==null&&E0!==null)?`Shift ${fmt12(S0)} – ${fmt12(E0)} · ${L}-min lunch`:"Shift · set your start and end";
+  const h=hoursCalc(s), el=$("hRes"), r=+s.rate||0;
+  $("hAdd").textContent=`Put on ${dayLabel(s.hDay??0)}`;
+  if(!h){el.innerHTML=`<p class="hint">Enter your clock-in and clock-out times.</p>`;$("hAdd").disabled=true;return;}
+  $("hAdd").disabled=false;
+  const d=h.d, f=x=>(+x).toFixed(1).replace(/\.0$/,"");
+  const ot=d.ot, dt=d.dt+d.holW;
+  const pay=(d.holH+d.pto+d.st)*r+d.ot*r*1.5+(d.dt+d.holW)*r*2;
+  const split=[ot?`${f(ot)} at 1.5×`:"",dt?`${f(dt)} at 2×`:""].filter(Boolean).join(" · ");
+  el.innerHTML=`<div class="hbig"><div><span>Regular</span><b>${f(d.st)}</b>${h.hol?"<small>+ 8 holiday pay</small>":""}</div><div class="otw"><span>OT worked</span><b>${f(ot+dt)}</b>${split?`<small>${split}</small>`:""}</div><div class="pto"><span>PTO used</span><b>${f(h.p)}</b></div><div><span>Total worked</span><b>${f(h.w)}</b></div></div>`+
+    `<div class="hsum"><span>Gross for the day</span><span>${money(pay)}</span></div>`;
+}
+function showTab(t){
+  $("tabPay").setAttribute("aria-selected",t==="pay"); $("tabHrs").setAttribute("aria-selected",t==="hrs"); $("tabVac").setAttribute("aria-selected",t==="vac");
+  $("payTab").hidden=t!=="pay"; $("hoursTab").hidden=t!=="hrs"; $("vacTab").hidden=t!=="vac"; $("hMsg").textContent="";
+}
+// ---- Vacation tab (contract Article 8) ----
+// Weekly credit: 1 hr per N paid hours by seniority (<5 yrs 17, 5-10 16, 10-15 13, 15-20 12, 20-25 11, 25+ 10),
+// to the nearest tenth. Premium hours count as straight hours. 3rd shift worked hours x 8/6.5.
+// Credit goes to sick leave until 40 hrs are earned for the year (the week that crosses 40 still goes to sick), then to vacation.
+function parseDateMDY(v){const m=String(v||"").trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);if(!m)return null;let y=+m[3];if(y<100)y+=2000;const d=new Date(y,+m[1]-1,+m[2]);return d.getMonth()===+m[1]-1&&d.getDate()===+m[2]?d:null;}
+function yrsBetween(a,b){let y=b.getFullYear()-a.getFullYear();if(b.getMonth()<a.getMonth()||(b.getMonth()===a.getMonth()&&b.getDate()<a.getDate()))y--;return y;}
+function vacDivisor(y){return y<5?17:y<10?16:y<15?13:y<20?12:y<25?11:10;}
+const r1=x=>Math.round(x*10+1e-9)/10;
+function renderVac(s,c){
+  const el=$("vRes"), sd=parseDateMDY(s.senDate), raw=(s.senDate||"").trim();
+  $("senR").classList.toggle("bad",!!raw&&!sd); $("senR").textContent=raw?(sd?fmtD(sd)+", "+sd.getFullYear():"Check the month, day and 4-digit year"):"";
+  if(!sd){el.innerHTML=`<p class="hint">Enter your seniority date to see your vacation.</p>`;return;}
+  const today=new Date(), yrs=yrsBetween(sd,today), div=vacDivisor(yrs);
+  const H=s.holD||[], wk=[0,0], hrsW=[0,0];
+  for(let k=0;k<14;k++){
+    const w=k<7?0:1, i=k%7, d=c.days[k]||{};
+    let worked=(+s.hours[k]||0)+(+(s.otD||[])[k]||0);
+    if(s.shift3)worked=worked*8/6.5;
+    const paid=worked+(+(s.pto||[])[k]||0)+((H[k]&&i<5)?8:0);
+    wk[w]+=paid; hrsW[w]+=paid;
+  }
+  let sick=Math.max(0,num(s.sickE,0)), toSick=0, toVac=0; const lines=[];
+  wk.forEach((h,w)=>{const cr=r1(h/div); if(sick<40){sick=r1(sick+cr);toSick=r1(toSick+cr);lines.push(`Week ${w+1}: ${+h.toFixed(1)} paid hrs \u2192 ${cr} hrs to sick leave`);}else{toVac=r1(toVac+cr);lines.push(`Week ${w+1}: ${+h.toFixed(1)} paid hrs \u2192 ${cr} hrs to vacation`);}});
+  const bal=s.vacBal!==""&&s.vacBal!=null?r1(num(s.vacBal,0)+toVac):null;
+  // projection to the next anniversary at this period's pace (sick leave resets then)
+  let ann=new Date(today.getFullYear(),sd.getMonth(),sd.getDate()); if(ann<=today)ann=new Date(today.getFullYear()+1,sd.getMonth(),sd.getDate());
+  const weeksLeft=Math.max(0,Math.floor((dayN(ann)-dayN(today))/7)), avg=(wk[0]+wk[1])/2, crW=r1(avg/div);
+  let ps=sick, pv=0; for(let n=0;n<weeksLeft;n++){if(ps<40)ps=r1(ps+crW);else pv=r1(pv+crW);}
+  const sickFull=num(s.sickE,0)>=40;
+  const tot=+(wk[0]+wk[1]).toFixed(1), src=(who==="mel"&&CAL)?`Based on your Paycheck hours: <b>${fmtD(CAL.start)} \u2013 ${fmtD(CAL.end)}</b> (${tot} paid hrs)`:`Based on your Visualize hours (${tot} paid hrs)`;
+  el.innerHTML=`<p class="vsrc">${src}</p><div class="hbig"><div class="otw"><span>Vacation this period</span><b>${toVac}</b><small>hrs</small></div><div class="pto"><span>Sick leave this period</span><b>${toSick}</b><small>hrs \u00b7 ${r1(sick)} of 40 this year</small></div>`+
+    `<div><span>Vacation balance after</span><b>${bal===null?"\u2013":bal}</b><small>${bal===null?"add your balance above":"hrs"}</small></div><div><span>Your rate</span><b>1 / ${div}</b><small>${yrs} yrs seniority \u00b7 1 hr per ${div} paid</small></div></div>`+
+    `<p class="daydet">${lines.join("<br>")}</p>`+
+    `<div class="hsum"><span>By ${fmtD(ann)}, ${ann.getFullYear()} at this pace</span><span>+${pv} hrs vacation</span></div>`+
+    `<p class="hint" style="margin-top:8px">${sickFull?"Your sick leave is full for the year, so all credit goes to vacation.":"Sick leave fills to 40 hrs first, then credit goes to vacation."} Sick leave starts over on your anniversary (${fmtD(ann)}): the first 40 hrs after that go to sick leave.${yrs<5?` At 5 years (${fmtD(new Date(sd.getFullYear()+5,sd.getMonth(),sd.getDate()))}, ${sd.getFullYear()+5}) your rate improves to 1 per 16.`:""}</p>`;
+}
+function stampHolidays(){if(!CAL)return;DEF.forEach((_,k)=>{if(HOLIDAYS.has(CAL.dates[k]))$("hd"+k).setAttribute("aria-pressed","true");});}
+// Day rules: no regular hours on Sat, Sun or holidays; regular is capped at 8 minus PTO.
+// Extra regular hours move to OT, so the day's total (and pay) never changes.
+function isHolDay(k){return $("hd"+k).getAttribute("aria-pressed")==="true"||!!(who==="mel"&&CAL&&HOLIDAYS.has(CAL.dates[k]));}
+function normalizeDays(){
+  const moved=[];
+  for(let k=0;k<14;k++){
+    const i=k%7, hi=$("h"+k), oi=$("o"+k);
+    const off=i>=5||isHolDay(k);
+    let reg=Math.max(0,+hi.value||0), ot=Math.max(0,+oi.value||0), pto=Math.max(0,+$("p"+k).value||0);
+    const cap=off?0:Math.max(0,8-pto);
+    if(reg>cap){
+      const x=+(reg-cap).toFixed(2), typing=!off&&document.activeElement===hi;
+      if(typing){reg=cap;hi.value=reg;moved.push([k,x,off,true]);}          // typing in Regular: stop at the cap
+      else{ot=+(ot+x).toFixed(2);reg=cap;hi.value=reg;oi.value=ot;moved.push([k,x,off,false]);} // PTO, holiday or older entry: move the extra to OT
+    }
+    hi.disabled=off; hi.placeholder=off?"\u2013":"";
+    if(off&&hi.value!=="")hi.value="";
+  }
+  return moved;
+}
+let gridMsgT;
+function flashGrid(moved){
+  if(!moved.length)return;
+  const [k,x,off,typing]=moved[moved.length-1], cap=Math.max(0,8-(+$("p"+k).value||0));
+  $("gridMsg").textContent=off?`${k%7>=5?DAYS[k%7]:"Holiday"} hours are all OT, so ${x} hrs moved to OT.`:typing?`Regular stops at ${cap} hrs that day. Put the rest in OT.`:`Regular stops at ${cap} hrs that day, so ${x} hrs moved to OT.`;
+  clearTimeout(gridMsgT); gridMsgT=setTimeout(()=>{$("gridMsg").textContent="";},5000);
+}
+function render(){
+  const moved=normalizeDays(); if(document.activeElement&&/^[hop]\d+$/.test(document.activeElement.id||""))flashGrid(moved);
+  read();
+  const s=state[who];
+  // Pay calendar (Current only): first time, stamp this period's union holidays
+  if(who==="mel"&&CAL){
+    if(s.periodId===undefined)s.periodId=CAL.id;
+    // Union holidays on the calendar are always marked on Current (locked on)
+    DEF.forEach((_,k)=>{if(HOLIDAYS.has(CAL.dates[k]))s.holD[k]=true;});
+  }
+  const c=calc(s);
+  $("copyCurRow").hidden=who!=="tif";
+  $("presets").hidden=who==="mel";   // presets are for what-ifs only
+  renderCal(s);
+  renderHours(s);
+  renderVac(s,c);
+  const sum=a=>a.reduce((x,y)=>x+(+y||0),0);
+  const wkT=(a,b)=>{const h=sum(s.hours.slice(a,b)),o=sum((s.otD||[]).slice(a,b)),p=sum((s.pto||[]).slice(a,b));return (h+o)+" hrs"+(o?` · ${o} OT`:"")+(p?` · ${p} PTO`:"");};
+  $("setupSum").textContent=(+s.rate>0)?`Your setup · $${(+s.rate).toFixed(2)}/hr · 401(k) ${+((+s.k401||0)+(+s.k401r||0)+(+s.k401a||0)).toFixed(2)}% · ${FSN[s.fs]||FSN.mfj}`:"Your setup · start here";
+  const noRate=!(+s.rate>0);
+  $("sNet").textContent=noRate?"Add your rate":money(c.net); $("sGross").textContent=noRate?"—":money(c.gross);
+  $("wk1t").textContent=wkT(0,7);
+  $("wk2t").textContent=wkT(7,14);
+  DEF.forEach((_,k)=>$("dn"+k).setAttribute("aria-pressed",k===selDay));
+  [1,2].forEach(w=>{const el=$("dd"+w),on=selDay!==null&&Math.floor(selDay/7)===w-1;el.hidden=!on;if(on)el.textContent=dayText(selDay,s);});
+  $("netCap").textContent=`${PEOPLE[who].name} · take-home this check`;
+  if(who==="mel"&&CAL){const ord=["1st","2nd","3rd"][CAL.rank-1]||CAL.rank+"th";$("plateStamp").textContent=`${MON[CAL.pay.getMonth()]} ${ord} check · paid ${CAL.pay.getMonth()+1}/${CAL.pay.getDate()}`;}
+  else $("plateStamp").textContent="What-if · not a real check";
+  $("dtTag").hidden=!(c.qEnd>=160&&(c.dt>0||c.ot===0)&&!noRate);
+  $("net").textContent=noRate?"Add your rate":money(c.net);
+  $("kGross").textContent=noRate?"—":money(c.gross);
+  $("kMonth").textContent=noRate?"—":money(c.net*2);
+  $("kYear").textContent=noRate?"—":money(c.net*26);
+  $("earn").innerHTML=
+    row("Straight time",`${(c.st).toFixed(1)} hrs worked${c.pto?` + ${c.pto} PTO`:""}${c.leave?` + ${c.leave} leave`:""}${c.holH?` + ${c.holH} holiday`:""} × $${c.r.toFixed(2)}`,money(c.stPay))+
+    row("Overtime 1.5×",`${c.ot.toFixed(1)} hrs × $${(c.r*1.5).toFixed(2)}${c.qReset?` · old quarter ${c.q0} → ${+c.qAt.toFixed(1)} hrs, new quarter ${+c.qEnd.toFixed(1)} hrs`:(c.q0||c.qEnd>=160?` · quarter OT ${c.q0} → ${+c.qEnd.toFixed(1)} hrs${c.qEnd>=160?" (past 160: extra OT at 2×)":""}`:"")}`,money(c.otPay))+
+    row("Double time 2×",`${c.dt.toFixed(1)} hrs × $${(c.r*2).toFixed(2)}`,money(c.dtPay))+
+    (c.holW?row("Holiday worked 2×",`${c.holW} hrs × $${(c.r*2).toFixed(2)}`,money(c.holPay)):"")+
+    `<tr class="tot"><td>Gross pay</td><td class="n">${money(c.gross)}</td></tr>`;
+  $("ded").innerHTML=
+    row("Federal income tax",`${FSN[s.fs]||FSN.mfj} · ${money(c.fedBase)} base + ${money(+s.extra||0)} W-4 extra${c.credit?` · after ${money(c.credit)}/yr dependents credit`:""}`,money(c.fed))+
+    row("Social Security",c.room<=0?"Stopped: past $184,500 for the year":(c.room<c.gross-c.med?`6.2%, stops this check at $184,500 for the year`:"6.2% of gross after medical"),money(c.ss))+
+    row("Medicare",c.mcAdd>0?`1.45% + 0.9% extra over $200,000 (${money(c.mcAdd)})`:"1.45% of gross after medical",money(c.mc))+
+    row("401(k) pre-tax",`${+s.k401||0}% of straight-time pay, before tax`,money(c.k))+
+    (c.kR?row("401(k) Roth",`${+s.k401r}% of straight-time pay, after tax`,money(c.kR)):"")+
+    (c.kA?row("401(k) after-tax",`${+s.k401a}% of straight-time pay, after tax`,money(c.kA)):"")+
+    (c.loan?row("401(k) loan","",money(c.loan)):"")+
+    row("Medical",(c.cal&&!c.cal.medOn)?"Skipped on a 3rd check in a month":"",money(c.med-c.oPre))+
+    (c.oPre?row("Other before-tax","",money(c.oPre)):"")+
+    (c.espp?row("Stock purchase plan",`${c.esppPct}% of straight-time pay, after tax`,money(c.espp)):"")+
+    (c.oPost?row("Other after-tax","",money(c.oPost)):"")+
+    (c.dues?row(c.cal?(c.cal.duesOn?"Union dues":"MNPL"):"Union dues + MNPL",c.cal?(c.cal.duesOn?"1st check of the month":"2nd check of the month"):`${money(c.duesM)} + ${money(c.mnplM)}`,money(c.dues)):"")+
+    row("WA Paid Leave (PFML)",c.room<=0?"Stopped: past $184,500 for the year":"0.807%",money(c.pfml))+
+    row("WA Cares (LTC)","0.58%",money(c.ltc))+
+    row("WA L&I",`${c.worked} hrs × $0.08`,money(c.lni))+
+    `<tr class="tot"><td>Take-home</td><td class="n">${money(c.net)}</td></tr>`;
+  const kTotal=(c.k+c.kR+c.kA)*26, match=c.stPay*0.12*26;
+  save();
+  $("note").textContent=`Your 401(k) adds ${money(c.k+c.kR+c.kA)} this check plus about ${money(c.stPay*0.12)} from the 12% company match (≈ ${money(kTotal+match)} a year at this pace).`;
+}
+document.querySelectorAll("input").forEach(el=>el.addEventListener("input",render));
+document.querySelectorAll("input[type=checkbox]").forEach(el=>el.addEventListener("change",render));
+$("fs").addEventListener("change",render);
+// Two-tap confirm: first tap arms the button, second tap applies
+function confirmTap(b,action){
+  if(!b.dataset.label)b.dataset.label=b.textContent;
+  if(b.dataset.armed!=="1"){
+    document.querySelectorAll("[data-armed='1']").forEach(o=>{o.dataset.armed="";o.textContent=o.dataset.label;o.classList.remove("armed");});
+    b.dataset.armed="1";b.textContent="Sure? Tap again";b.classList.add("armed");
+    clearTimeout(b._t);b._t=setTimeout(()=>{b.dataset.armed="";b.textContent=b.dataset.label;b.classList.remove("armed");},4000);
+    return;
+  }
+  clearTimeout(b._t);b.dataset.armed="";b.textContent=b.dataset.label;b.classList.remove("armed");
+  action();
+}
+// Easier entry: number keypad with a decimal point, and tapping a box selects it so you can type over it
+document.querySelectorAll("input[type=number],input[type=text]").forEach(i=>{if(i.type==="number")i.setAttribute("inputmode","decimal");i.addEventListener("focus",()=>setTimeout(()=>{try{i.select();}catch(e){}},0));});
+const goResults=()=>document.querySelector(".panel[aria-live]").scrollIntoView({behavior:"smooth",block:"start"});
+$("sticky").addEventListener("click",goResults);
+$("sticky").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();goResults();}});
+// Info buttons: what each box is and where to find it
+const INFO={
+  rate:"Your hourly rate from your stub, including lead pay. On 2nd shift add $1.25, on 3rd shift add $0.30. If you got a raise partway through this pay period, the check will be a little different from what's shown.",
+  k401:"The percent of your straight-time pay you put in your 401(k) before tax. It lowers your federal income tax now. Find all three 401(k) percents in Fidelity NetBenefits under Contributions.",
+  k401r:"Roth 401(k): comes out after tax, so it doesn't lower your tax now, but it grows tax-free. Put 0 if you don't use it.",
+  k401a:"After-tax 401(k) (not Roth): comes out after tax and is separate from Roth. Put 0 if you don't use it.",
+  extra:"Extra federal tax you chose on your W-4 (Step 4c). On your stub it shows as the additional withholding amount next to your federal tax info. Put 0 if you don't have one.",
+  credit:"The yearly dollar amount in Step 3 of your W-4, for kids and other dependents ($2,200 per child under 17, $500 per other dependent). You can see your W-4 on your employee pay portal. Put 0 if Step 3 is blank.",
+  oPre:"Dental, vision, FSA or anything else taken out before taxes on your stub. Add them up for one check.",
+  espp:"The percent of pay you put into your company stock purchase plan. It comes out after taxes, from straight-time pay only (regular, holiday, vacation and sick hours, not overtime), and buys company stock. Put 0 if you're not enrolled.",
+  oPost:"Life insurance, charity or anything else taken out after taxes on your stub. Add them up for one check.",
+  mnpl:"Machinists Non-Partisan Political League, the union's voluntary political fund. On your stub it comes out every other check. Put 0 if you don't contribute.",
+  ytd:"The year-to-date gross on your most recent stub, before the check you're figuring. Only matters near the yearly limits: Social Security stops at $184,500 and an extra 0.9% Medicare starts over $200,000.",
+  dues:"Dues and MNPL come out every other check. From the paystubs checked so far, union dues come out of the first check of the month and MNPL out of the second. A third check in the same month has neither (and no medical either). ⚠ Based on a few stubs, not yet confirmed.",
+  q160h:"Your quarter overtime hours before this pay period started. Find it with your overtime balances in your timekeeping system (current quarter hours). Copy it in at the start of each pay period, right after you tap Clear hours. If you check it mid-period, it already includes this period's first week, so subtract the overtime from the days already in your grid. Once you pass 160, every extra overtime hour that quarter pays 2×, and the calculator switches at the exact hour. Leave it blank if you're nowhere near 160. It resets to 0 when a new quarter starts.",
+  hLunch:"Check this if you worked through your lunch and claimed it. Your lunch time is then paid instead of taken out, which adds it as overtime (0.5 hrs for a 30-minute lunch). Leave it unchecked if you took your normal unpaid lunch.",
+  senM:"Your seniority date sets your vacation rate. Find it with your leave balances in your timekeeping system. Enter the month, day and 4-digit year, like 1 / 13 / 2023.",
+  sickE:"Sick leave earned since your last eligibility date. Find it with your sick leave balance in your timekeeping system (earned since your eligibility date). Once it reaches 40, everything you earn goes to vacation.",
+  vacBal:"Optional. Your current vacation hours, from your timekeeping system. The calculator adds this period's vacation to it.",
+  shift3:"On 3rd shift, each hour worked counts as 8/6.5 hours toward vacation and sick credit.",
+  step2:"Only check this if Step 2 on your W-4 is checked (multiple jobs, or your spouse works). Your employer then withholds more federal tax from each check. You can see your W-4 on your employee pay portal."
+};
+Object.entries(INFO).forEach(([id,txt])=>{
+  const inp=$(id); if(!inp)return;
+  const lab=document.querySelector(`label[for="${id}"]`)||inp.closest("label"); if(!lab)return;
+  const b=document.createElement("button"); b.type="button"; b.className="ib"; b.textContent="i";
+  b.setAttribute("aria-label","What is this?"); b.setAttribute("aria-expanded","false");
+  const p=document.createElement("p"); p.className="info"; p.hidden=true; p.textContent=txt;
+  if(lab.htmlFor){const w=document.createElement("div");w.className="lab";lab.parentNode.insertBefore(w,lab);w.append(lab,b);inp.parentNode.appendChild(p);}
+  else{lab.appendChild(b);lab.insertAdjacentElement("afterend",p);}
+  b.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();p.hidden=!p.hidden;b.setAttribute("aria-expanded",!p.hidden);});
+});
+// Holiday toggle: remember the day's entries when H goes on, and put them back exactly when it goes off
+document.querySelectorAll(".hd").forEach(b=>b.addEventListener("click",()=>{
+  const k=+b.id.slice(2), s=state[who], on=b.getAttribute("aria-pressed")!=="true";
+  s.holStash=s.holStash||{};
+  if(on)s.holStash[k]={h:$("h"+k).value,o:$("o"+k).value,p:$("p"+k).value};
+  b.setAttribute("aria-pressed",on);
+  if(!on&&s.holStash[k]){const st=s.holStash[k];$("h"+k).disabled=false;$("h"+k).value=st.h;$("o"+k).value=st.o;$("p"+k).value=st.p;delete s.holStash[k];}
+  const m=normalizeDays();render();if(on)flashGrid(m);
+}));
+document.querySelectorAll(".dn").forEach(b=>b.addEventListener("click",()=>{const k=+b.id.slice(2);selDay=selDay===k?null:k;render();}));
+document.querySelectorAll(".presets button").forEach(b=>b.addEventListener("click",()=>confirmTap(b,()=>{
+  state[who].holStash={};PRESETS[b.dataset.p].forEach((h,i)=>{const rg=i<5?Math.min(h,8):0;[i,i+7].forEach(k=>{const hol=who==="mel"&&CAL&&HOLIDAYS.has(CAL.dates[k]);$("h"+k).value=hol?0:rg;$("o"+k).value=hol?"":((h-rg)||"");$("p"+k).value="";$("hd"+k).setAttribute("aria-pressed","false");});}); render();
+})));
+$("copy").onclick=()=>confirmTap($("copy"),()=>{const hs=state[who].holStash||{};for(let i=0;i<7;i++){delete hs[i+7];$("h"+(i+7)).value=$("h"+i).value;$("o"+(i+7)).value=$("o"+i).value;$("p"+(i+7)).value=$("p"+i).value;$("hd"+(i+7)).setAttribute("aria-pressed",(who==="mel"&&CAL)?String(HOLIDAYS.has(CAL.dates[i+7])):$("hd"+i).getAttribute("aria-pressed"));} render();});
+function pick(p){read();who=p;$("pMel").setAttribute("aria-pressed",p==="mel");$("pTif").setAttribute("aria-pressed",p==="tif");write();render();}
+$("pMel").onclick=()=>pick("mel"); $("pTif").onclick=()=>pick("tif");
+const KEY="paycheck-calc-v1";
+let dbRef=null, dbLast=null, dbTimer=null, dbBusy=false, dbQueued=false;
+let seen=0, ack=false;
+function payload(){return JSON.stringify({who,state,seen,ack});}
+function apply(d){if(d&&typeof d.seen==="number")seen=Math.max(seen,d.seen);if(d&&d.ack)ack=true;if(d&&d.state){["mel","tif"].forEach(k=>{if(d.state[k])Object.assign(state[k],d.state[k]);});if(d.who in state)who=d.who;}}
+function save(){
+  const p=payload(); let local=false;
+  try{localStorage.setItem(KEY,p);local=true;}catch(e){}
+  if(dbRef){ if(p!==dbLast){clearTimeout(dbTimer);dbTimer=setTimeout(flush,800);} $("saved").textContent="Saved to your account"; }
+  else $("saved").textContent=local?"Saved on this device":"Can't save in this browser";
+}
+async function flush(){
+  if(!dbRef)return; if(dbBusy){dbQueued=true;return;}
+  const p=payload(); if(p===dbLast)return;
+  dbBusy=true;
+  try{await dbRef.set({json:p});dbLast=p;}catch(e){dbRef=null;save();}
+  dbBusy=false; if(dbQueued){dbQueued=false;flush();}
+}
+function load(){try{apply(JSON.parse(localStorage.getItem(KEY)||"null"));}catch(e){}}
+function syncToggle(){$("pMel").setAttribute("aria-pressed",who==="mel");$("pTif").setAttribute("aria-pressed",who==="tif");}
+async function connect(){
+  try{
+    if(!window.claude||!window.claude.use)return;
+    const [u,d]=await Promise.all([claude.use("user"),claude.use("db")]);
+    if(!u||!d)return;
+    if(u.can){const w=await u.can("data.write"); if(w===false)return;}
+    const id=await u.id(); if(!id)return;
+    const ref=d.doc("data/users/"+id+"/calc");
+    const snap=await ref.get();
+    const j=snap.exists?snap.data().json:null;
+    if(typeof j==="string"){apply(JSON.parse(j));dbLast=j;} else dbLast=payload();
+    dbRef=ref; syncToggle(); write(); render();
+  }catch(e){}
+}
+// Default: two confirmations. Step 1 explains, step 2 asks "Are you sure?"
+let defStage=0;
+function closeDef(){defStage=0;$("defBox").hidden=true;}
+$("reset").onclick=()=>{
+  const m=PEOPLE.mel;
+  defStage=1; $("defStep").textContent="Step 1 of 2"; $("defTitle").textContent="Reset to default?";
+  $("defMsg").textContent=`This sets the ${PEOPLE[who].name} profile to the starting setup: $${m.rate.toFixed(2)}/hr, ${m.k401}% 401(k), $${m.extra} W-4 extra, $${m.loan} 401(k) loan, married jointly, and the standard deductions. Every day's hours, PTO and holidays go to 0. The other profile isn't changed.`;
+  $("defGo").textContent="Continue"; $("defBox").hidden=false; try{$("defCancel").focus();}catch(e){}
+};
+$("defGo").onclick=()=>{
+  if(defStage===1){defStage=2;$("defStep").textContent="Step 2 of 2";$("defTitle").textContent="Are you sure?";$("defMsg").textContent="Your current numbers on this profile will be replaced. This can't be undone.";$("defGo").textContent="Yes, reset";return;}
+  const z=Array(14).fill(0);
+  state[who]={...PEOPLE.mel,name:PEOPLE[who].name,hours:z.slice(),otD:z.slice(),pto:z.slice(),holD:Array(14).fill(false),dues:true,q160h:""};
+  if(who==="mel"&&CAL)state.mel.periodId=CAL.id;
+  selDay=null; closeDef(); write(); if(who==="mel")stampHolidays(); render();
+};
+$("defCancel").onclick=closeDef;
+// Clear hours: new pay period. Keeps rate and deductions, zeroes every day's hours, PTO and holidays.
+$("clearH").onclick=()=>confirmTap($("clearH"),()=>{
+  clearDays();
+});
+function clearDays(){
+  state[who].holStash={};
+  for(let k=0;k<14;k++){$("h"+k).value=0;$("o"+k).value="";$("p"+k).value="";$("hd"+k).setAttribute("aria-pressed","false");}
+  if(who==="mel"&&CAL){state.mel.periodId=CAL.id;stampHolidays();}
+  selDay=null; render();
+}
+$("npClear").onclick=clearDays;
+// Visualize: copy Current's setup (pay setup, deductions, shift). Hours stay as they are.
+const SETUP_KEYS=["senDate","sickE","vacBal","shift3","rate","k401","k401r","k401a","extra","loan","fs","med","duesAmt","mnpl","ytd","credit","oPre","oPost","espp","step2","hsS","hsE","hsL"];
+// Move setup between devices: a code with the pay setup, deductions and shift (never hours)
+const enc=o=>"PAY1-"+btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+const dec=t=>{t=String(t||"").trim().replace(/\s+/g,"");if(!t.startsWith("PAY1-"))throw 0;return JSON.parse(decodeURIComponent(escape(atob(t.slice(5)))));};
+$("xCopy").onclick=()=>{
+  read(); const s=state[who], o={}; SETUP_KEYS.forEach(k=>{if(s[k]!==undefined)o[k]=s[k];});
+  const code=enc(o), box=$("xBox"); box.hidden=false; box.readOnly=true; box.value=code; $("xLoad").hidden=true;
+  const done=()=>{$("xMsg").textContent="Copied. Paste it into Notes or a text to yourself. On the other device, open Your setup \u2192 Load setup and paste it.";};
+  const fail=()=>{try{box.focus();box.select();}catch(e){}$("xMsg").textContent="Copy the code in the box (it's selected), then paste it into Notes or a text to yourself.";};
+  try{navigator.clipboard.writeText(code).then(done,fail);}catch(e){fail();}
+};
+$("xLoadOpen").onclick=()=>{const box=$("xBox");box.hidden=false;box.readOnly=false;box.value="";$("xLoad").hidden=false;$("xMsg").textContent=`Paste a setup code. It replaces the setup on ${PEOPLE[who].name}; your hours stay.`;try{box.focus();}catch(e){}};
+$("xLoad").onclick=()=>confirmTap($("xLoad"),()=>{
+  let o; try{o=dec($("xBox").value);}catch(e){$("xMsg").textContent="That code didn't work. Copy the whole code, starting with PAY1-, and try again.";return;}
+  read(); const s=state[who]; let n=0; SETUP_KEYS.forEach(k=>{if(o[k]!==undefined){s[k]=o[k];n++;}});
+  if(!n){$("xMsg").textContent="That code didn't have any setup in it.";return;}
+  write(); render(); $("setup").open=true; $("xBox").hidden=true; $("xLoad").hidden=true; $("xMsg").textContent="Setup loaded. Your hours weren't changed.";
+});
+// Visualize: copy Current's 14 days (Regular, OT, PTO, holiday marks). Setup is not touched.
+$("copyCurH").onclick=()=>confirmTap($("copyCurH"),()=>{
+  read(); const src=state.mel;
+  for(let k=0;k<14;k++){
+    const h=(src.hours||[])[k], o=(src.otD||[])[k], pt=(src.pto||[])[k];
+    $("h"+k).disabled=false; $("h"+k).value=h?h:0; $("o"+k).value=o?o:""; $("p"+k).value=pt?pt:"";
+    $("hd"+k).setAttribute("aria-pressed",String(!!(src.holD||[])[k]));
+  }
+  state.tif.holStash={}; selDay=null; render();
+});
+$("copyCur").onclick=()=>confirmTap($("copyCur"),()=>{
+  read(); const src=state.mel, dst=state.tif;
+  SETUP_KEYS.forEach(k=>{if(src[k]!==undefined)dst[k]=src[k];});
+  write(); render();
+});
+$("tabPay").onclick=()=>showTab("pay"); $("tabHrs").onclick=()=>showTab("hrs"); $("tabVac").onclick=()=>showTab("vac");
+[["senM","senD",2],["senD","senY",2]].forEach(([a,b,n])=>$(a).addEventListener("input",()=>{if($(a).value.replace(/\D/g,"").length>=n)$(b).focus();}));
+$("hDay").addEventListener("change",()=>{const k=+$("hDay").value;$("hHol").checked=(who==="mel"&&CAL)?HOLIDAYS.has(CAL.dates[k]):$("hd"+k).getAttribute("aria-pressed")==="true";$("hMsg").textContent="";render();});
+$("hAdd").onclick=()=>{const s=state[who],h=hoursCalc(s);if(!h)return;{const rg=+h.d.st.toFixed(1);$("h"+h.k).value=rg;$("o"+h.k).value=+(h.w-rg).toFixed(1)||"";}$("p"+h.k).value=h.p||"";$("hd"+h.k).setAttribute("aria-pressed",h.hol);selDay=h.k;render();$("hMsg").textContent=`Put on ${dayLabel(h.k)}: ${h.w} hrs worked${h.p?`, ${h.p} PTO`:""}${h.hol?", holiday":""}. Switch to Paycheck to see your check.`;};
+$("npKeep").onclick=()=>{state.mel.periodId=CAL.id;render();};
+// Keep the calendar on today's date: recheck every minute and whenever the app comes back to the screen
+function tick(){const t=new Date(),c=calFor(t);const changed=!CAL||c.todayYmd!==CAL.todayYmd;CAL=c;if(changed)render();}
+setInterval(tick,60000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
+// What's new: bump NOTES_VERSION and edit NOTES with each update
+const NOTES_VERSION=11;
+const NOTES=[
+  "Small wording cleanup, plus a short note at the bottom about what this calculator is and isn't"
+];
+function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
+function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}
+$("wnOk").onclick=closeNotes;
+$("ackOk").onclick=()=>{ack=true;$("ackBox").hidden=true;save();showNotes();};
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("whatsnew").hidden)closeNotes();});
+CAL=calFor(new Date());
+load();
+syncToggle();
+write(); render();
+let notesShown=false;
+const notesT=setTimeout(()=>{notesShown=true;showNotes();},2500);
+connect().finally(()=>{clearTimeout(notesT);if(!notesShown)showNotes();else if(seen>=NOTES_VERSION)$("whatsnew").hidden=true;});
+</script>
+
+</body>
+</html>

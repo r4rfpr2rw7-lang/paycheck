@@ -61,6 +61,9 @@ h1{font-family:var(--f-display);font-weight:800;font-size:38px;line-height:.95;l
 .field label{font-size:14px;color:var(--muted)}
 input[type=number],input[type=text],select{font:500 16px var(--f-num);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-bottom:1.5px solid var(--muted);border-radius:2px;padding:8px;width:100%}
 input:focus-visible,select:focus-visible,button:focus-visible,[role=button]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.days.nosick .sickc{display:none}
+.sicktog{background:none;border:0;color:var(--accent);font:700 13px var(--f-body);text-decoration:underline;cursor:pointer;padding:2px 0 8px;display:block}
+.sicktog[hidden]{display:none}
 .days{display:grid;grid-template-columns:58px repeat(7,minmax(0,1fr));gap:5px 5px;margin-bottom:6px;align-items:center}
 .days .rl{font:600 11.5px var(--f-body);font-stretch:85%;color:var(--muted)}
 .days .dn{font:700 13px var(--f-body);font-stretch:85%;letter-spacing:0;color:var(--ink);background:none;border:0;border-bottom:2px solid transparent;padding:2px 0;cursor:pointer;text-align:center}
@@ -308,7 +311,7 @@ td{font-weight:600}
   <nav class="tabs" role="tablist" aria-label="Calculator">
     <button id="tabPay" role="tab" aria-selected="true" type="button">Paycheck</button>
     <button id="tabHrs" role="tab" aria-selected="false" type="button">Hours Calculator</button>
-    <button id="tabVac" role="tab" aria-selected="false" type="button">Vacation</button>
+    <button id="tabVac" role="tab" aria-selected="false" type="button">PTO</button>
   </nav>
 
   <div class="grid" id="payTab">
@@ -365,6 +368,7 @@ td{font-weight:600}
       <div class="wkhead"><p class="label">Week 2</p><span id="wk2t" class="wkt"></span><button id="copy" class="mini" type="button">Copy week 1</button></div>
       <div class="days" id="days2"></div>
       <p class="daydet" id="dd2" hidden></p>
+      <button type="button" class="sicktog" id="sickTog" aria-expanded="false">＋ Add sick hours</button>
       <p class="gridmsg" id="gridMsg" role="status"></p>
       <p class="hint">Regular = straight-time hours, up to 8 a day (less any PTO). Anything past that goes in OT. Saturday, Sunday and holidays are all OT. A holiday that falls on a weekend pays normal weekend rates; its 8 holiday hours are paid on the weekday the union calendar lists. PTO counts toward the day's first 8 hours. Tap H for a holiday. Tap a day name to see its pay.</p>
       <div class="presets" id="presets">
@@ -393,6 +397,7 @@ td{font-weight:600}
       <label class="check" id="duesRow"><input type="checkbox" id="dues" checked> <span>Union dues + MNPL come out this check (every other check)</span></label>
       <p class="hint" id="duesAuto" hidden></p>
       <div class="row"><div class="field"><label for="q160h">Quarter OT before this pay period</label><input id="q160h" type="number" step="0.5" min="0" placeholder="0"></div></div>
+      <p class="hint qend" id="qRollNote" hidden></p>
       <p class="hint qend" id="qEndNote" hidden></p>
     </section>
 
@@ -458,6 +463,7 @@ td{font-weight:600}
       <div class="field" id="senYrsF" hidden><label for="senYrs">Years of seniority</label><input id="senYrs" type="number" inputmode="numeric" step="1" min="0" max="50" placeholder="Like 5"></div>
       <div class="field"><label for="sickE">Sick leave earned this year (hrs)</label><input id="sickE" type="number" step="0.1" min="0" placeholder="0"></div>
       <div class="field"><label for="vacBal">Vacation balance now (hrs)</label><input id="vacBal" type="number" step="0.1" min="0" placeholder="0"></div>
+      <div class="field"><label for="sickBal">Sick leave balance now (hrs)</label><input id="sickBal" type="number" step="0.1" min="0" placeholder="0"></div>
     </div>
     <label class="check"><input type="checkbox" id="shift3"> <span>I work 3rd shift</span></label>
     <div class="hres" id="vRes"></div>
@@ -559,14 +565,19 @@ let selDay=null;
   html+='<span class="rl">Regular</span>';
   ORDER.forEach(i=>html+=`<input type="number" id="h${o+i}" min="0" max="8" step="0.5" aria-label="Week ${wk} ${DAYS[i]} hours worked">`);
   html+='<span class="rl">OT</span>';
-  ORDER.forEach(i=>html+=`<input type="number" class="ot" id="o${o+i}" min="0" max="16" step="0.5" placeholder="0" aria-label="Week ${wk} ${DAYS[i]} overtime hours">`);
-  html+='<span class="rl">PTO</span>';
-  ORDER.forEach(i=>html+=`<input type="number" class="pto" id="p${o+i}" min="0" max="12" step="0.5" placeholder="0" aria-label="Week ${wk} ${DAYS[i]} PTO hours">`);
+  ORDER.forEach(i=>html+=`<input type="number" class="ot" id="o${o+i}" placeholder="0" min="0" max="16" step="0.5" aria-label="Week ${wk} ${DAYS[i]} overtime hours">`);
+  html+='<span class="rl">Vacation</span>';
+  ORDER.forEach(i=>html+=`<input type="number" class="pto" id="p${o+i}" placeholder="0" min="0" max="12" step="0.5" aria-label="Week ${wk} ${DAYS[i]} vacation hours">`);
+  html+='<span class="rl sickc">Sick</span>';
+  ORDER.forEach(i=>html+=`<input type="number" class="pto sickc" id="sk${o+i}" placeholder="0" min="0" max="12" step="0.5" aria-label="Week ${wk} ${DAYS[i]} sick leave hours">`);
   html+='<span class="rl">Holiday</span>';
   ORDER.forEach(i=>html+=`<button type="button" class="hd" id="hd${o+i}" aria-pressed="false" aria-label="Week ${wk} ${DAYS[i]} holiday">H</button>`);
   el.innerHTML=html;
 });
 
+// Paid time off for a day = vacation + sick (both pay 1× and fill the day's first 8)
+const ptoAt=(p,k)=>(+(p.pto||[])[k]||0)+(+(p.sickD||[])[k]||0);
+const ptoIn=k=>(+$("p"+k).value||0)+(+$("sk"+k).value||0);
 // One day under the union rules. i = 0 Mon … 4 Fri, 5 Sat, 6 Sun.
 // Weekday: PTO + worked fill the first 8 at 1×, next 2 at 1.5×, rest 2×.
 // Holiday: 8 hrs holiday pay at 1× + every worked hour at 2×.
@@ -584,7 +595,7 @@ function dayPay(i,h,p,hol){
 function calc(p){
   const cal=(p===state.mel)?CAL:null; // pay calendar applies to the Current profile only
   let st=0,pto=0,ot=0,dt=0,holH=0,holW=0,worked=0;
-  const P=p.pto||[], H=p.holD||[];
+  const P=Array.from({length:14},(_,k)=>ptoAt(p,k)), H=p.holD||[];
   // 160-hr rule, day by day in pay-period order (Fri → Thu, week 1 then week 2).
   // All OT counts toward 160 (holidays too); 1.5× hours past 160 become 2×.
   let cum=Math.max(0,p.q160h!==undefined?num(p.q160h,0):(p.q160?160:0)); const q0=cum; const days=[]; let qReset=false, qAt=0;
@@ -630,7 +641,7 @@ function calc(p){
 function read(){
   const s=state[who];
   s.step2=$("step2").checked; s.q160h=$("q160h").value;
-  {const m=$("senM").value.replace(/\D/g,""),d=$("senD").value.replace(/\D/g,""),y=$("senY").value.replace(/\D/g,"");s.senDate=(m||d||y)?`${m}/${d}/${y}`:"";} s.senYrs=$("senYrs").value; s.sickE=$("sickE").value; s.vacBal=$("vacBal").value; s.shift3=$("shift3").checked;
+  {const m=$("senM").value.replace(/\D/g,""),d=$("senD").value.replace(/\D/g,""),y=$("senY").value.replace(/\D/g,"");s.senDate=(m||d||y)?`${m}/${d}/${y}`:"";} s.senYrs=$("senYrs").value; s.sickE=$("sickE").value; s.vacBal=$("vacBal").value; s.sickBal=$("sickBal").value; s.shift3=$("shift3").checked;
   s.hsS=$("hsS").value; s.hsE=$("hsE").value; s.hsL=$("hsL").value; s.hIn=$("hIn").value; s.hOut=$("hOut").value; s.hClaim=$("hLunch").checked; s.hHol=$("hHol").checked;
   if($("hDay").value!=="")s.hDay=+$("hDay").value;
   s.espp=$("espp").value; s.k401r=$("k401r").value; s.k401a=$("k401a").value;
@@ -640,6 +651,7 @@ function read(){
   s.hours=DEF.map((_,i)=>+$("h"+i).value||0);
   s.otD=DEF.map((_,i)=>+$("o"+i).value||0);
   s.pto=DEF.map((_,i)=>+$("p"+i).value||0);
+  s.sickD=DEF.map((_,i)=>+$("sk"+i).value||0);
   s.holD=DEF.map((_,i)=>$("hd"+i).getAttribute("aria-pressed")==="true");
   s.leave=$("leave").value; s.hol=$("hol").value; s.holw=$("holw").value; s.dues=$("dues").checked;
 }
@@ -649,7 +661,7 @@ function write(){
   $("setup").open=!(+s.rate>0);
   buildDayOpts();
   if(s.hDay==null){let t=0;if(who==="mel"&&CAL){const f=DEF.findIndex((_,k)=>CAL.dates[k]===CAL.todayYmd);if(f>=0)t=f;}else t=4;s.hDay=t;}
-  {const pt=String(s.senDate||"").split(/[\/\-.]/);$("senM").value=pt[0]||"";$("senD").value=pt[1]||"";$("senY").value=pt[2]||"";} $("senYrs").value=s.senYrs??""; $("sickE").value=s.sickE??""; $("vacBal").value=s.vacBal??""; $("shift3").checked=!!s.shift3;
+  {const pt=String(s.senDate||"").split(/[\/\-.]/);$("senM").value=pt[0]||"";$("senD").value=pt[1]||"";$("senY").value=pt[2]||"";} $("senYrs").value=s.senYrs??""; $("sickE").value=s.sickE??""; $("vacBal").value=s.vacBal??""; $("sickBal").value=s.sickBal??""; $("shift3").checked=!!s.shift3;
   $("hDay").value=s.hDay; $("hsS").value=s.hsS||"6:00"; $("hsE").value=s.hsE||"2:30"; $("hsL").value=s.hsL??30;
   $("hIn").value=s.hIn||""; $("hOut").value=s.hOut||""; $("hLunch").checked=!!s.hClaim; $("hHol").checked=!!s.hHol;
   $("step2").checked=!!s.step2; $("q160h").value=s.q160h??(s.q160?160:"");
@@ -659,7 +671,7 @@ function write(){
   $("fs").value=s.fs||"mfj"; $("rate").value=s.rate; $("k401").value=s.k401; $("extra").value=s.extra; $("loan").value=s.loan;
   s.hours.forEach((h,i)=>$("h"+i).value=h);
   DEF.forEach((_,i)=>{const v=(s.otD||[])[i];$("o"+i).value=v?v:"";});
-  DEF.forEach((_,i)=>{const v=(s.pto||[])[i];$("p"+i).value=v?v:"";$("hd"+i).setAttribute("aria-pressed",!!(s.holD||[])[i]);});
+  DEF.forEach((_,i)=>{const v=(s.pto||[])[i];$("p"+i).value=v?v:"";const sv=(s.sickD||[])[i];$("sk"+i).value=sv?sv:"";$("hd"+i).setAttribute("aria-pressed",!!(s.holD||[])[i]);});
   $("leave").value=s.leave??0; $("hol").value=s.hol??0; $("holw").value=s.holw??0;
   $("legacy").hidden=!((+s.leave||0)||(+s.hol||0)||(+s.holw||0));
   $("dues").checked=s.dues??true;
@@ -799,8 +811,10 @@ function renderVac(s,c){
   }
   let sick=Math.max(0,num(s.sickE,0)), toSick=0, toVac=0; const lines=[];
   wk.forEach((h,w)=>{const cr=r1(h/div); if(sick<40){sick=r1(sick+cr);toSick=r1(toSick+cr);lines.push(`Week ${w+1}: ${+h.toFixed(1)} hrs worked \u2192 ${cr} hrs to sick leave`);}else{toVac=r1(toVac+cr);lines.push(`Week ${w+1}: ${+h.toFixed(1)} hrs worked \u2192 ${cr} hrs to vacation`);}});
-  const ptoUsed=r1((s.pto||[]).reduce((a,v)=>a+(+v||0),0));
+  const ptoUsed=r1((s.pto||[]).reduce((a,v)=>a+(+v||0),0)), sickUsed=r1((s.sickD||[]).reduce((a,v)=>a+(+v||0),0));
   const bal=s.vacBal!==""&&s.vacBal!=null?r1(num(s.vacBal,0)+toVac-ptoUsed):null;
+  const sbal=s.sickBal!==""&&s.sickBal!=null?r1(num(s.sickBal,0)+toSick-sickUsed):null;
+  const lr=s.lRoll, rollNote=(!viz&&CAL&&lr&&lr.to===CAL.id)?(()=>{const [y,m,d]=lr.from.split("-").map(Number),os=new Date(y,m-1,d);return `<p class="hint vroll">Updated by itself from ${fmtD(os)} – ${fmtD(addD(os,13))}: vacation +${lr.toV} earned − ${lr.vacUsed} used, sick leave +${lr.toS} earned − ${lr.sickUsed} used${lr.reset?". Your anniversary passed, so sick leave earned this year started over":""}.</p>`;})():"";
   // projection to the next anniversary at this period's pace (sick leave resets then)
   let ann=null; if(!viz){ann=new Date(today.getFullYear(),sd.getMonth(),sd.getDate()); if(ann<=today)ann=new Date(today.getFullYear()+1,sd.getMonth(),sd.getDate());}
   const weeksLeft=viz?52:Math.max(0,Math.floor((dayN(ann)-dayN(today))/7)), avg=(wk[0]+wk[1])/2, crW=r1(avg/div);
@@ -808,10 +822,10 @@ function renderVac(s,c){
   const sickFull=num(s.sickE,0)>=40;
   const tot=+(wk[0]+wk[1]).toFixed(1), src=(who==="mel"&&CAL)?`Based on your Paycheck hours: <b>${fmtD(CAL.start)} \u2013 ${fmtD(CAL.end)}</b> (${tot} hrs worked)`:`Based on your Visualize hours (${tot} hrs worked)`;
   el.innerHTML=`<p class="vsrc">${src}</p><div class="hbig"><div class="otw"><span>Vacation this period</span><b>${toVac}</b><small>hrs</small></div><div class="pto"><span>Sick leave this period</span><b>${toSick}</b><small>hrs \u00b7 ${r1(sick)} of 40 this year</small></div>`+
-    `<div><span>Vacation balance after</span><b>${bal===null?"\u2013":bal}</b><small>${bal===null?"add your balance above":`${num(s.vacBal,0)} + ${toVac} earned${ptoUsed?` \u2212 ${ptoUsed} PTO used`:""}`}</small></div><div><span>Your rate</span><b>1 / ${div}</b><small>${yrs} yrs seniority \u00b7 1 hr per ${div} worked</small></div></div>`+
-    `<p class="daydet">${lines.join("<br>")}</p>`+
+    `<div><span>Vacation balance after</span><b>${bal===null?"\u2013":bal}</b><small>${bal===null?"add your balance above":`${num(s.vacBal,0)} + ${toVac} earned${ptoUsed?` \u2212 ${ptoUsed} used`:""}`}</small></div><div><span>Sick balance after</span><b>${sbal===null?"\u2013":sbal}</b><small>${sbal===null?"add your balance above":`${num(s.sickBal,0)} + ${toSick} earned${sickUsed?` \u2212 ${sickUsed} used`:""}`}</small></div></div>`+
+    `<p class="daydet">Your rate: 1 hr per ${div} worked (${yrs} yrs seniority)<br>${lines.join("<br>")}</p>`+rollNote+
     `<div class="hsum"><span>${viz?"A full year at this pace":`By ${fmtD(ann)}, ${ann.getFullYear()} at this pace`}</span><span>+${pv} hrs vacation</span></div>`+
-    `<p class="hint" style="margin-top:8px">${sickFull?"Your sick leave is full for the year, so all credit goes to vacation.":"Sick leave fills to 40 hrs first, then credit goes to vacation."} Only hours worked earn credit; PTO and holiday pay don't. PTO you enter on the Paycheck tab is taken out of your vacation balance. ${viz?`Sick leave starts over each year on your anniversary: the first 40 hrs go to sick leave.${nextT?` At ${nextT} years the rate improves to 1 per ${vacDivisor(nextT)}.`:""}`:`Sick leave starts over on your anniversary (${fmtD(ann)}): the first 40 hrs after that go to sick leave.${yrs<5?` At 5 years (${fmtD(new Date(sd.getFullYear()+5,sd.getMonth(),sd.getDate()))}, ${sd.getFullYear()+5}) your rate improves to 1 per 16.`:""}`}</p>`;
+    `<p class="hint" style="margin-top:8px">${sickFull?"Your sick leave is full for the year, so all credit goes to vacation.":"Sick leave fills to 40 hrs first, then credit goes to vacation."} Only hours worked earn credit; vacation, sick and holiday pay don't. Vacation and Sick hours you enter on the Paycheck tab come out of those balances. ${viz?`Sick leave starts over each year on your anniversary: the first 40 hrs go to sick leave.${nextT?` At ${nextT} years the rate improves to 1 per ${vacDivisor(nextT)}.`:""}`:`Sick leave starts over on your anniversary (${fmtD(ann)}): the first 40 hrs after that go to sick leave.${yrs<5?` At 5 years (${fmtD(new Date(sd.getFullYear()+5,sd.getMonth(),sd.getDate()))}, ${sd.getFullYear()+5}) your rate improves to 1 per 16.`:""}`}</p>`;
 }
 function stampHolidays(){if(!CAL)return;DEF.forEach((_,k)=>{if(HOLIDAYS.has(CAL.dates[k]))$("hd"+k).setAttribute("aria-pressed","true");});}
 // Day rules: no regular hours on Sat, Sun or holidays; regular is capped at 8 minus PTO.
@@ -822,7 +836,7 @@ function normalizeDays(){
   for(let k=0;k<14;k++){
     const i=k%7, hi=$("h"+k), oi=$("o"+k);
     const off=i>=5||isHolDay(k);
-    let reg=Math.max(0,+hi.value||0), ot=Math.max(0,+oi.value||0), pto=Math.max(0,+$("p"+k).value||0);
+    let reg=Math.max(0,+hi.value||0), ot=Math.max(0,+oi.value||0), pto=Math.max(0,ptoIn(k));
     const cap=off?0:Math.max(0,8-pto);
     if(reg>cap){
       const x=+(reg-cap).toFixed(2), typing=!off&&document.activeElement===hi;
@@ -837,13 +851,13 @@ function normalizeDays(){
 let gridMsgT;
 function flashGrid(moved){
   if(!moved.length)return;
-  const [k,x,off,typing]=moved[moved.length-1], cap=Math.max(0,8-(+$("p"+k).value||0));
+  const [k,x,off,typing]=moved[moved.length-1], cap=Math.max(0,8-ptoIn(k));
   $("gridMsg").textContent=off?`${k%7>=5?DAYS[k%7]:"Holiday"} hours are all OT, so ${x} hrs moved to OT.`:typing?`Regular stops at ${cap} hrs that day. Put the rest in OT.`:`Regular stops at ${cap} hrs that day, so ${x} hrs moved to OT.`;
   clearTimeout(gridMsgT); gridMsgT=setTimeout(()=>{$("gridMsg").textContent="";},5000);
 }
 function render(){renderQEnd();
   const moved=normalizeDays(); if(document.activeElement&&/^[hop]\d+$/.test(document.activeElement.id||""))flashGrid(moved);
-  read();
+  read();renderQRoll();renderSick();
   const s=state[who];
   // Pay calendar (Current only): first time, stamp this period's union holidays
   if(who==="mel"&&CAL){
@@ -858,7 +872,7 @@ function render(){renderQEnd();
   renderHours(s);
   renderVac(s,c);
   const sum=a=>Math.round(a.reduce((x,y)=>x+(+y||0),0)*10+1e-9)/10;
-  const wkT=(a,b)=>{const h=sum(s.hours.slice(a,b)),o=sum((s.otD||[]).slice(a,b)),p=sum((s.pto||[]).slice(a,b));return `${h} Regular · ${o} OT · ${p} PTO`;};
+  const wkT=(a,b)=>{const h=sum(s.hours.slice(a,b)),o=sum((s.otD||[]).slice(a,b)),p=sum((s.pto||[]).slice(a,b)),sk=sum((s.sickD||[]).slice(a,b));return `${h} Regular · ${o} OT · ${p} Vacation · ${sk} Sick`;};
   $("setupSum").textContent=(+s.rate>0)?`Your setup · $${(+s.rate).toFixed(2)}/hr · 401(k) ${+((+s.k401||0)+(+s.k401r||0)+(+s.k401a||0)).toFixed(2)}% · ${FSN[s.fs]||FSN.mfj}`:"Your setup · start here";
   const noRate=!(+s.rate>0);
   $("sNet").textContent=noRate?"Add your rate":money(c.net); $("sGross").textContent=noRate?"—":money(c.gross);
@@ -875,7 +889,7 @@ function render(){renderQEnd();
   $("kMonth").textContent=noRate?"—":money(c.net*2);
   $("kYear").textContent=noRate?"—":money(c.net*26);
   $("earn").innerHTML=
-    row("Straight time",`${(c.st).toFixed(1)} hrs worked${c.pto?` + ${c.pto} PTO`:""}${c.leave?` + ${c.leave} leave`:""}${c.holH?` + ${c.holH} holiday`:""} × $${c.r.toFixed(2)}`,money(c.stPay))+
+    row("Straight time",`${(c.st).toFixed(1)} hrs worked${(()=>{const v=sum(s.pto||[]),k=sum(s.sickD||[]);return (v?` + ${v} vacation`:"")+(k?` + ${k} sick`:"");})()}${c.leave?` + ${c.leave} leave`:""}${c.holH?` + ${c.holH} holiday`:""} × $${c.r.toFixed(2)}`,money(c.stPay))+
     row("Overtime 1.5×",`${c.ot.toFixed(1)} hrs × $${(c.r*1.5).toFixed(2)}${c.qReset?` · old quarter ${c.q0} → ${+c.qAt.toFixed(1)} hrs, new quarter ${+c.qEnd.toFixed(1)} hrs`:(c.q0||c.qEnd>=160?` · quarter OT ${c.q0} → ${+c.qEnd.toFixed(1)} hrs${c.qEnd>=160?" (past 160: extra OT at 2×)":""}`:"")}`,money(c.otPay))+
     row("Double time 2×",`${c.dt.toFixed(1)} hrs × $${(c.r*2).toFixed(2)}`,money(c.dtPay))+
     (c.holW?row("Holiday worked 2×",`${c.holW} hrs × $${(c.r*2).toFixed(2)}`,money(c.holPay)):"")+
@@ -935,11 +949,12 @@ const INFO={
   mnpl:"Machinists Non-Partisan Political League, the union's voluntary political fund. On your stub it comes out every other check. Put 0 if you don't contribute.",
   ytd:"The year-to-date gross on your most recent stub, before the check you're figuring. Only matters near the yearly limits: Social Security stops at $184,500 and an extra 0.9% Medicare starts over $200,000.",
   dues:"Dues and MNPL come out every other check. From the paystubs checked so far, union dues come out of the first check of the month and MNPL out of the second. A third check in the same month has neither (and no medical either). ⚠ Based on a few stubs, not yet confirmed.",
-  q160h:"Your quarter overtime hours before this pay period started. Find it with your overtime balances in your timekeeping system (current quarter hours). Copy it in at the start of each pay period, right after you tap Clear hours. If you check it mid-period, it already includes this period's first week, so subtract the overtime from the days already in your grid. Once you pass 160, every extra overtime hour that quarter pays 2×, and the calculator switches at the exact hour. Leave it blank if you're nowhere near 160. It resets to 0 when a new quarter starts.",
+  q160h:"Your quarter overtime hours before this pay period started. Find it with your overtime balances in your timekeeping system (current quarter hours). On Current you only need to enter it once: when a new pay period starts and you tap Start new period or Keep hours, it adds the last period's overtime by itself (and restarts at 0 when a quarter ends). Check it against your timekeeping system now and then. If you check it mid-period, it already includes this period's first week, so subtract the overtime from the days already in your grid. Once you pass 160, every extra overtime hour that quarter pays 2×, and the calculator switches at the exact hour. Leave it blank if you're nowhere near 160. It resets to 0 when a new quarter starts.",
   hLunch:"Check this if you worked through your lunch and claimed it. Your lunch time is then paid instead of taken out, which adds it as overtime (0.5 hrs for a 30-minute lunch). Leave it unchecked if you took your normal unpaid lunch.",
   senM:"Your seniority date sets your vacation rate. Find it with your leave balances in your timekeeping system. Enter the month, day and 4-digit year, like 1 / 13 / 2023.",
   sickE:"Sick leave earned since your last eligibility date. Find it with your sick leave balance in your timekeeping system (earned since your eligibility date). Once it reaches 40, everything you earn goes to vacation.",
-  vacBal:"Optional. Your current vacation hours, from your timekeeping system. The calculator adds this period's vacation to it and subtracts any PTO you entered on the Paycheck tab.",
+  vacBal:"Optional. Your current vacation hours, from your timekeeping system. The calculator adds this period's vacation to it and subtracts the vacation hours you entered on the Paycheck tab. On Current you only enter it once: it carries forward by itself each new pay period.",
+  sickBal:"Optional. Your current sick leave hours, from your timekeeping system. The calculator adds the sick leave you earn and subtracts the sick hours you entered on the Paycheck tab. On Current it carries forward by itself each new pay period.",
   shift3:"On 3rd shift, each hour worked counts as 8/6.5 hours toward vacation and sick credit.",
   step2:"Only check this if Step 2 on your W-4 is checked (multiple jobs, or your spouse works). Your employer then withholds more federal tax from each check. You can see your W-4 on your employee pay portal."
 };
@@ -957,25 +972,25 @@ Object.entries(INFO).forEach(([id,txt])=>{
 document.querySelectorAll(".hd").forEach(b=>b.addEventListener("click",()=>{
   const k=+b.id.slice(2), s=state[who], on=b.getAttribute("aria-pressed")!=="true";
   s.holStash=s.holStash||{};
-  if(on)s.holStash[k]={h:$("h"+k).value,o:$("o"+k).value,p:$("p"+k).value};
+  if(on)s.holStash[k]={h:$("h"+k).value,o:$("o"+k).value,p:$("p"+k).value,sk:$("sk"+k).value};
   b.setAttribute("aria-pressed",on);
-  if(!on&&s.holStash[k]){const st=s.holStash[k];$("h"+k).disabled=false;$("h"+k).value=st.h;$("o"+k).value=st.o;$("p"+k).value=st.p;delete s.holStash[k];}
+  if(!on&&s.holStash[k]){const st=s.holStash[k];$("h"+k).disabled=false;$("h"+k).value=st.h;$("o"+k).value=st.o;$("p"+k).value=st.p;$("sk"+k).value=st.sk||"";delete s.holStash[k];}
   const m=normalizeDays();render();if(on)flashGrid(m);
 }));
 document.querySelectorAll(".dn").forEach(b=>b.addEventListener("click",()=>{const k=+b.id.slice(2);selDay=selDay===k?null:k;render();}));
-$("copy").onclick=()=>confirmTap($("copy"),()=>{const hs=state[who].holStash||{};for(let i=0;i<7;i++){delete hs[i+7];$("h"+(i+7)).value=$("h"+i).value;$("o"+(i+7)).value=$("o"+i).value;$("p"+(i+7)).value=$("p"+i).value;$("hd"+(i+7)).setAttribute("aria-pressed",(who==="mel"&&CAL)?String(HOLIDAYS.has(CAL.dates[i+7])):$("hd"+i).getAttribute("aria-pressed"));} render();});
+$("copy").onclick=()=>confirmTap($("copy"),()=>{const hs=state[who].holStash||{};for(let i=0;i<7;i++){delete hs[i+7];$("h"+(i+7)).value=$("h"+i).value;$("o"+(i+7)).value=$("o"+i).value;$("p"+(i+7)).value=$("p"+i).value;$("sk"+(i+7)).value=$("sk"+i).value;$("hd"+(i+7)).setAttribute("aria-pressed",(who==="mel"&&CAL)?String(HOLIDAYS.has(CAL.dates[i+7])):$("hd"+i).getAttribute("aria-pressed"));} render();});
 
 // Visualize presets: starters + the user's own, all editable. Stored with the Visualize profile.
 const STARTERS=[["40 hrs, no OT","40"],["10-hr weekdays","10"],["12-hr weekdays","12"],["10-hr + Saturday","10s"],["10-hr + Sat + Sun","10ss"]];
 function starter(name,key){const h=[],o=[],z=Array(14).fill(0);PRESETS[key].forEach((v,i)=>{const rg=i<5?Math.min(v,8):0;[i,i+7].forEach(k=>{h[k]=rg;o[k]=v-rg;});});return {name,h,o,p:z.slice(),hol:Array(14).fill(false)};}
 function myP(){const t=state.tif;if(!Array.isArray(t.myPresets))t.myPresets=[];if(!t.startersIn){const have=t.myPresets;t.myPresets=STARTERS.filter(x=>!have.some(m=>m.name===x[0])).map(x=>starter(...x)).concat(have);t.startersIn=true;}return t.myPresets;}
-function gridNow(name){const g=a=>Array.from({length:14},(_,k)=>a(k));return {name,h:g(k=>+$("h"+k).value||0),o:g(k=>+$("o"+k).value||0),p:g(k=>+$("p"+k).value||0),hol:g(k=>$("hd"+k).getAttribute("aria-pressed")==="true")};}
+function gridNow(name){const g=a=>Array.from({length:14},(_,k)=>a(k));return {name,h:g(k=>+$("h"+k).value||0),o:g(k=>+$("o"+k).value||0),p:g(k=>+$("p"+k).value||0),sk:g(k=>+$("sk"+k).value||0),hol:g(k=>$("hd"+k).getAttribute("aria-pressed")==="true")};}
 function mk(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e;}
 function renderMine(){
   const box=$("mine"),list=$("mineList"),L=myP();box.textContent="";list.textContent="";
   L.forEach((m,i)=>{
     const b=mk("button",null,m.name);b.type="button";
-    b.addEventListener("click",()=>confirmTap(b,()=>{state.tif.holStash={};for(let k=0;k<14;k++){$("h"+k).disabled=false;$("h"+k).value=m.h[k]||0;$("o"+k).value=m.o[k]||"";$("p"+k).value=m.p[k]||"";$("hd"+k).setAttribute("aria-pressed",String(!!m.hol[k]));}normalizeDays();render();}));
+    b.addEventListener("click",()=>confirmTap(b,()=>{state.tif.holStash={};for(let k=0;k<14;k++){$("h"+k).disabled=false;$("h"+k).value=m.h[k]||0;$("o"+k).value=m.o[k]||"";$("p"+k).value=m.p[k]||"";$("sk"+k).value=(m.sk||[])[k]||"";$("hd"+k).setAttribute("aria-pressed",String(!!m.hol[k]));}normalizeDays();render();}));
     box.appendChild(b);
     const row=mk("div","mitem"),nm=mk("input");nm.type="text";nm.maxLength=20;nm.value=m.name;nm.setAttribute("aria-label","Preset name");
     nm.addEventListener("change",()=>{const v=nm.value.trim();if(v){m.name=v;}nm.value=m.name;renderMine();save();});
@@ -1045,7 +1060,7 @@ $("reset").onclick=()=>{
 $("defGo").onclick=()=>{
   if(defStage===1){defStage=2;$("defStep").textContent="Step 2 of 2";$("defTitle").textContent="Are you sure?";$("defMsg").textContent="Your current numbers on this profile will be replaced. This can't be undone.";$("defGo").textContent="Yes, reset";return;}
   const z=Array(14).fill(0);
-  const keepMine=state[who].myPresets;state[who]={...PEOPLE.mel,name:PEOPLE[who].name,hours:z.slice(),otD:z.slice(),pto:z.slice(),holD:Array(14).fill(false),dues:true,q160h:""};if(keepMine)state[who].myPresets=keepMine;
+  const keepMine=state[who].myPresets;state[who]={...PEOPLE.mel,name:PEOPLE[who].name,hours:z.slice(),otD:z.slice(),pto:z.slice(),sickD:z.slice(),holD:Array(14).fill(false),dues:true,q160h:""};if(keepMine)state[who].myPresets=keepMine;
   if(who==="mel"&&CAL)state.mel.periodId=CAL.id;
   selDay=null; closeDef(); write(); if(who==="mel")stampHolidays(); render();
 };
@@ -1056,13 +1071,74 @@ $("clearH").onclick=()=>confirmTap($("clearH"),()=>{
 });
 function clearDays(){
   state[who].holStash={};
-  for(let k=0;k<14;k++){$("h"+k).value=0;$("o"+k).value="";$("p"+k).value="";$("hd"+k).setAttribute("aria-pressed","false");}
+  for(let k=0;k<14;k++){$("h"+k).value=0;$("o"+k).value="";$("p"+k).value="";$("sk"+k).value="";$("hd"+k).setAttribute("aria-pressed","false");}
   if(who==="mel"&&CAL){state.mel.periodId=CAL.id;stampHolidays();}
   selDay=null; render();
 }
-$("npClear").onclick=clearDays;
+
+
+
+// Sick row stays tucked away until someone needs it (or already has sick hours entered).
+function renderSick(){
+  const s=state[who], has=(s.sickD||[]).some(v=>+v>0), show=!!s.showSick||has;
+  $("days1").classList.toggle("nosick",!show); $("days2").classList.toggle("nosick",!show);
+  const t=$("sickTog"); t.hidden=has; t.textContent=show?"Hide sick row":"＋ Add sick hours"; t.setAttribute("aria-expanded",String(show));
+}
+$("sickTog").onclick=()=>{const s=state[who];s.showSick=!s.showSick;renderSick();save();if(s.showSick)$("sk"+ORDER[0]).focus();};
+// Current: when a new pay period starts, carry vacation and sick balances forward from the period that ended.
+function rollLeave(){
+  const s=state.mel; if(!CAL||!s.periodId||s.periodId===CAL.id)return;
+  const [y,m,d]=s.periodId.split("-").map(Number), os=new Date(y,m-1,d), osN=dayN(os), gapN=dayN(CAL.start)-osN;
+  const tot=a=>r1((a||[]).reduce((x,v)=>x+(+v||0),0)), vacUsed=tot(s.pto), sickUsed=tot(s.sickD);
+  const sd=parseDateMDY(s.senDate); let sickE=Math.max(0,num(s.sickE,0)), toS=0, toV=0, reset=false;
+  if(sd){
+    const div=vacDivisor(yrsBetween(sd,addD(os,13)));
+    let aOff=null; for(const Y of [os.getFullYear(),os.getFullYear()+1]){const o=dayN(new Date(Y,sd.getMonth(),sd.getDate()))-osN;if(o>=0&&o<gapN&&aOff===null)aOff=o;}
+    for(const w of [0,1]){
+      if(aOff!==null&&!reset&&aOff<=7*w){sickE=0;reset=true;}
+      let wh=0; for(let k=w*7;k<w*7+7;k++)wh+=(+s.hours[k]||0)+(+(s.otD||[])[k]||0);
+      if(s.shift3)wh=wh*8/6.5;
+      const cr=r1(wh/div); if(sickE<40){sickE=r1(sickE+cr);toS=r1(toS+cr);}else toV=r1(toV+cr);
+    }
+    if(aOff!==null&&!reset){sickE=0;reset=true;}
+    s.sickE=String(sickE); $("sickE").value=sickE;
+  }
+  if(s.vacBal!==""&&s.vacBal!=null){s.vacBal=String(r1(num(s.vacBal,0)+toV-vacUsed));$("vacBal").value=s.vacBal;}
+  if(s.sickBal!==""&&s.sickBal!=null){s.sickBal=String(r1(num(s.sickBal,0)+toS-sickUsed));$("sickBal").value=s.sickBal;}
+  s.lRoll={to:CAL.id,from:s.periodId,toV,toS,vacUsed,sickUsed,reset};
+}
+// Current: roll "Quarter OT before this pay period" forward when a new pay period starts.
+// Adds every OT hour from the period that just ended (same count as the 160 rule: OT, double time,
+// holiday hours worked). If a quarter ended inside that period, or in a gap of skipped periods,
+// it restarts and counts only the hours after the quarter end.
+function rollQuarter(){
+  const s=state.mel; if(!CAL||!s.periodId||s.periodId===CAL.id)return;
+  const [y,m,d]=s.periodId.split("-").map(Number), os=new Date(y,m-1,d), osN=dayN(os);
+  const qN=QENDS.map(q=>{const [a,b,c]=q.split("-").map(Number);return dayN(new Date(a,b-1,c));});
+  let qOff=null; qN.forEach(n=>{const o=n-osN;if(o>=0&&o<=13)qOff=o;});
+  let q=Math.max(0,num(s.q160h,0)), add=0, reset=false;
+  for(const w of [0,7]) for(const i of ORDER){
+    const k=w+i, off=w+ORDER.indexOf(i);
+    if(qOff!==null&&!reset&&off>qOff){q=0;reset=true;}
+    const dd=dayPay(i,(+s.hours[k]||0)+(+(s.otD||[])[k]||0),ptoAt(s,k),(s.holD||[])[k]);
+    const h=dd.ot+dd.dt+dd.holW; q+=h; add+=h;
+  }
+  if(qOff===13){q=0;reset=true;}
+  if(qN.some(n=>n>osN+13&&n<dayN(CAL.start))){q=0;reset=true;}
+  q=r1(q); s.q160h=String(q); $("q160h").value=q;
+  s.qRoll={to:CAL.id,from:s.periodId,add:r1(add),reset,val:q};
+}
+function renderQRoll(){
+  const el=$("qRollNote"),s=state.mel,r=s.qRoll;
+  if(who!=="mel"||!CAL||!r||r.to!==CAL.id||String(s.q160h)!==String(r.val)){el.hidden=true;return;}
+  const [y,m,d]=r.from.split("-").map(Number),os=new Date(y,m-1,d);
+  el.innerHTML=r.reset?(r.val?`Updated by itself: a new quarter started, so it restarted at 0 and counted only the overtime after the quarter ended (<b>${r.val} hrs</b>).`:`Updated by itself: a new quarter started, so it reset to <b>0</b>.`):`Updated by itself: added <b>${r.add} OT hrs</b> from ${fmtD(os)} – ${fmtD(addD(os,13))}.`;
+  el.hidden=false;
+}
+$("npClear").onclick=()=>{read();rollLeave();rollQuarter();clearDays();};
+
 // Visualize: copy Current's setup (pay setup, deductions, shift). Hours stay as they are.
-const SETUP_KEYS=["senDate","sickE","vacBal","shift3","rate","k401","k401r","k401a","extra","loan","fs","med","duesAmt","mnpl","ytd","credit","oPre","oPost","espp","step2","hsS","hsE","hsL"];
+const SETUP_KEYS=["senDate","sickE","vacBal","sickBal","shift3","rate","k401","k401r","k401a","extra","loan","fs","med","duesAmt","mnpl","ytd","credit","oPre","oPost","espp","step2","hsS","hsE","hsL"];
 // Move setup between devices: a code with the pay setup, deductions and shift (never hours)
 const enc=o=>"PAY1-"+btoa(unescape(encodeURIComponent(JSON.stringify(o))));
 const dec=t=>{t=String(t||"").trim().replace(/\s+/g,"");if(!t.startsWith("PAY1-"))throw 0;return JSON.parse(decodeURIComponent(escape(atob(t.slice(5)))));};
@@ -1084,8 +1160,8 @@ $("xLoad").onclick=()=>confirmTap($("xLoad"),()=>{
 $("copyCurH").onclick=()=>confirmTap($("copyCurH"),()=>{
   read(); const src=state.mel;
   for(let k=0;k<14;k++){
-    const h=(src.hours||[])[k], o=(src.otD||[])[k], pt=(src.pto||[])[k];
-    $("h"+k).disabled=false; $("h"+k).value=h?h:0; $("o"+k).value=o?o:""; $("p"+k).value=pt?pt:"";
+    const h=(src.hours||[])[k], o=(src.otD||[])[k], pt=(src.pto||[])[k], sv=(src.sickD||[])[k];
+    $("h"+k).disabled=false; $("h"+k).value=h?h:0; $("o"+k).value=o?o:""; $("p"+k).value=pt?pt:""; $("sk"+k).value=sv?sv:"";
     $("hd"+k).setAttribute("aria-pressed",String(!!(src.holD||[])[k]));
   }
   state.tif.holStash={}; selDay=null; render();
@@ -1099,16 +1175,18 @@ $("tabPay").onclick=()=>showTab("pay"); $("tabHrs").onclick=()=>showTab("hrs"); 
 [["senM","senD",2],["senD","senY",2]].forEach(([a,b,n])=>$(a).addEventListener("input",()=>{if($(a).value.replace(/\D/g,"").length>=n)$(b).focus();}));
 $("hDay").addEventListener("change",()=>{const k=+$("hDay").value;$("hHol").checked=(who==="mel"&&CAL)?HOLIDAYS.has(CAL.dates[k]):$("hd"+k).getAttribute("aria-pressed")==="true";$("hMsg").textContent="";render();});
 $("hAdd").onclick=()=>{const s=state[who],h=hoursCalc(s);if(!h)return;{const rg=+h.d.st.toFixed(1);$("h"+h.k).value=rg;$("o"+h.k).value=+(h.w-rg).toFixed(1)||"";}$("p"+h.k).value=h.p||"";$("hd"+h.k).setAttribute("aria-pressed",h.hol);selDay=h.k;render();$("hMsg").textContent=`Put on ${dayLabel(h.k)}: ${h.w} hrs worked${h.p?`, ${h.p} PTO`:""}${h.hol?", holiday":""}. Switch to Paycheck to see your check.`;};
-$("npKeep").onclick=()=>{state.mel.periodId=CAL.id;render();};
+$("npKeep").onclick=()=>{read();rollLeave();rollQuarter();state.mel.periodId=CAL.id;render();};
 // Keep the calendar on today's date: recheck every minute and whenever the app comes back to the screen
 function tick(){const t=new Date(),c=calFor(t);const changed=!CAL||c.todayYmd!==CAL.todayYmd;CAL=c;if(changed)render();}
 setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=16;
+const NOTES_VERSION=17;
 const NOTES=[
-  "Shows the day the current overtime quarter ends, right under Quarter OT"
+  "Quarter OT, vacation and sick balances now add up by themselves: enter them once, then tap Start new period or Keep hours each new pay period",
+  "PTO is now Vacation, and there's a separate Sick row (tap Add sick hours under the grid). Your old PTO hours are kept as Vacation",
+  "The Vacation tab is now called PTO and tracks both your vacation and sick balances"
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

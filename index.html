@@ -393,6 +393,7 @@ td{font-weight:600}
       <label class="check" id="duesRow"><input type="checkbox" id="dues" checked> <span>Union dues + MNPL come out this check (every other check)</span></label>
       <p class="hint" id="duesAuto" hidden></p>
       <div class="row"><div class="field"><label for="q160h">Quarter OT before this pay period</label><input id="q160h" type="number" step="0.5" min="0" placeholder="0"></div></div>
+      <p class="hint qend" id="qEndNote" hidden></p>
     </section>
 
     <section class="panel" aria-live="polite">
@@ -518,6 +519,10 @@ const FSN={mfj:"Married jointly",single:"Single",hoh:"Head of household"};
 const PAYDATES=["2026-09-03","2026-09-17","2026-10-01","2026-10-15","2026-10-29","2026-11-12","2026-11-25","2026-12-10","2026-12-24","2027-01-07","2027-01-21","2027-02-04","2027-02-18","2027-03-04","2027-03-18","2027-04-01","2027-04-15","2027-04-29","2027-05-13","2027-05-27","2027-06-10","2027-06-24","2027-07-08","2027-07-22","2027-08-05","2027-08-19"];
 const HOLIDAYS=new Set(["2026-09-07","2026-11-26","2026-11-27","2026-12-24","2026-12-25","2026-12-28","2026-12-29","2026-12-30","2026-12-31","2027-01-01","2027-05-31","2027-07-05"]);
 const QENDS=["2026-09-24","2026-12-17","2027-03-25","2027-06-24"];
+function renderQEnd(){const el=$("qEndNote"),t=new Date(),tn=dayN(t);let nx=null;
+  for(const q of QENDS){const [y,m,d]=q.split("-").map(Number),dt=new Date(y,m-1,d);if(dayN(dt)>=tn){nx=dt;break;}}
+  if(!nx){el.hidden=true;return;}const n=dayN(nx)-tn;
+  el.innerHTML=`Current quarter ends <b>${fmtD(nx)}, ${nx.getFullYear()}</b> (${n===0?"today":n===1?"tomorrow":n+" days"}). Overtime after that starts the new quarter at 0.`;el.hidden=false;}
 const CARD_END="2027-08-26";
 const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"], MONL=["January","February","March","April","May","June","July","August","September","October","November","December"], WD=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const ANCHOR=new Date(2026,8,25); // Fri Sep 25, 2026 starts a pay period (Oct 15 check)
@@ -836,7 +841,7 @@ function flashGrid(moved){
   $("gridMsg").textContent=off?`${k%7>=5?DAYS[k%7]:"Holiday"} hours are all OT, so ${x} hrs moved to OT.`:typing?`Regular stops at ${cap} hrs that day. Put the rest in OT.`:`Regular stops at ${cap} hrs that day, so ${x} hrs moved to OT.`;
   clearTimeout(gridMsgT); gridMsgT=setTimeout(()=>{$("gridMsg").textContent="";},5000);
 }
-function render(){
+function render(){renderQEnd();
   const moved=normalizeDays(); if(document.activeElement&&/^[hop]\d+$/.test(document.activeElement.id||""))flashGrid(moved);
   read();
   const s=state[who];
@@ -1101,10 +1106,9 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=15;
+const NOTES_VERSION=16;
 const NOTES=[
-  "Vacation: only hours worked earn vacation now (PTO and holiday pay don't), and PTO you enter comes off your vacation balance",
-  "Visualize: the Vacation tab asks for years of seniority, so you can see what you'd earn at any point in your career"
+  "Shows the day the current overtime quarter ends, right under Quarter OT"
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

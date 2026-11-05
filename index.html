@@ -57,6 +57,7 @@ h1{font-family:var(--f-display);font-weight:800;font-size:38px;line-height:.95;l
 .label{font:600 12.5px var(--f-body);font-stretch:80%;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
 .row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px}
 .field{display:flex;flex-direction:column;gap:4px;flex:1 1 120px;min-width:0}
+.field[hidden]{display:none}
 .field label{font-size:14px;color:var(--muted)}
 input[type=number],input[type=text],select{font:500 16px var(--f-num);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-bottom:1.5px solid var(--muted);border-radius:2px;padding:8px;width:100%}
 input:focus-visible,select:focus-visible,button:focus-visible,[role=button]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -452,7 +453,8 @@ td{font-weight:600}
   <section class="panel hourspanel" id="vacTab" hidden>
     <p class="label">Your vacation info</p>
     <div class="row">
-      <div class="field"><label for="senM">Seniority date</label><div class="mdy"><input id="senM" type="text" inputmode="numeric" maxlength="2" autocomplete="off" placeholder="MM" aria-label="Seniority month"><span>/</span><input id="senD" type="text" inputmode="numeric" maxlength="2" autocomplete="off" placeholder="DD" aria-label="Seniority day"><span>/</span><input id="senY" type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="YYYY" aria-label="Seniority year"></div><small class="tread" id="senR"></small></div>
+      <div class="field" id="senF"><label for="senM">Seniority date</label><div class="mdy"><input id="senM" type="text" inputmode="numeric" maxlength="2" autocomplete="off" placeholder="MM" aria-label="Seniority month"><span>/</span><input id="senD" type="text" inputmode="numeric" maxlength="2" autocomplete="off" placeholder="DD" aria-label="Seniority day"><span>/</span><input id="senY" type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="YYYY" aria-label="Seniority year"></div><small class="tread" id="senR"></small></div>
+      <div class="field" id="senYrsF" hidden><label for="senYrs">Years of seniority</label><input id="senYrs" type="number" inputmode="numeric" step="1" min="0" max="50" placeholder="Like 5"></div>
       <div class="field"><label for="sickE">Sick leave earned this year (hrs)</label><input id="sickE" type="number" step="0.1" min="0" placeholder="0"></div>
       <div class="field"><label for="vacBal">Vacation balance now (hrs)</label><input id="vacBal" type="number" step="0.1" min="0" placeholder="0"></div>
     </div>
@@ -623,7 +625,7 @@ function calc(p){
 function read(){
   const s=state[who];
   s.step2=$("step2").checked; s.q160h=$("q160h").value;
-  {const m=$("senM").value.replace(/\D/g,""),d=$("senD").value.replace(/\D/g,""),y=$("senY").value.replace(/\D/g,"");s.senDate=(m||d||y)?`${m}/${d}/${y}`:"";} s.sickE=$("sickE").value; s.vacBal=$("vacBal").value; s.shift3=$("shift3").checked;
+  {const m=$("senM").value.replace(/\D/g,""),d=$("senD").value.replace(/\D/g,""),y=$("senY").value.replace(/\D/g,"");s.senDate=(m||d||y)?`${m}/${d}/${y}`:"";} s.senYrs=$("senYrs").value; s.sickE=$("sickE").value; s.vacBal=$("vacBal").value; s.shift3=$("shift3").checked;
   s.hsS=$("hsS").value; s.hsE=$("hsE").value; s.hsL=$("hsL").value; s.hIn=$("hIn").value; s.hOut=$("hOut").value; s.hClaim=$("hLunch").checked; s.hHol=$("hHol").checked;
   if($("hDay").value!=="")s.hDay=+$("hDay").value;
   s.espp=$("espp").value; s.k401r=$("k401r").value; s.k401a=$("k401a").value;
@@ -642,7 +644,7 @@ function write(){
   $("setup").open=!(+s.rate>0);
   buildDayOpts();
   if(s.hDay==null){let t=0;if(who==="mel"&&CAL){const f=DEF.findIndex((_,k)=>CAL.dates[k]===CAL.todayYmd);if(f>=0)t=f;}else t=4;s.hDay=t;}
-  {const pt=String(s.senDate||"").split(/[\/\-.]/);$("senM").value=pt[0]||"";$("senD").value=pt[1]||"";$("senY").value=pt[2]||"";} $("sickE").value=s.sickE??""; $("vacBal").value=s.vacBal??""; $("shift3").checked=!!s.shift3;
+  {const pt=String(s.senDate||"").split(/[\/\-.]/);$("senM").value=pt[0]||"";$("senD").value=pt[1]||"";$("senY").value=pt[2]||"";} $("senYrs").value=s.senYrs??""; $("sickE").value=s.sickE??""; $("vacBal").value=s.vacBal??""; $("shift3").checked=!!s.shift3;
   $("hDay").value=s.hDay; $("hsS").value=s.hsS||"6:00"; $("hsE").value=s.hsE||"2:30"; $("hsL").value=s.hsL??30;
   $("hIn").value=s.hIn||""; $("hOut").value=s.hOut||""; $("hLunch").checked=!!s.hClaim; $("hHol").checked=!!s.hHol;
   $("step2").checked=!!s.step2; $("q160h").value=s.q160h??(s.q160?160:"");
@@ -767,7 +769,7 @@ function showTab(t){
   $("payTab").hidden=t!=="pay"; $("hoursTab").hidden=t!=="hrs"; $("vacTab").hidden=t!=="vac"; $("hMsg").textContent="";
 }
 // ---- Vacation tab (contract Article 8) ----
-// Weekly credit: 1 hr per N paid hours by seniority (<5 yrs 17, 5-10 16, 10-15 13, 15-20 12, 20-25 11, 25+ 10),
+// Weekly credit: 1 hr per N hours worked (PTO and holiday pay excluded) by seniority (<5 yrs 17, 5-10 16, 10-15 13, 15-20 12, 20-25 11, 25+ 10),
 // to the nearest tenth. Premium hours count as straight hours. 3rd shift worked hours x 8/6.5.
 // Credit goes to sick leave until 40 hrs are earned for the year (the week that crosses 40 still goes to sick), then to vacation.
 function parseDateMDY(v){const m=String(v||"").trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);if(!m)return null;let y=+m[3];if(y<100)y+=2000;const d=new Date(y,+m[1]-1,+m[2]);return d.getMonth()===+m[1]-1&&d.getDate()===+m[2]?d:null;}
@@ -777,30 +779,34 @@ const r1=x=>Math.round(x*10+1e-9)/10;
 function renderVac(s,c){
   const el=$("vRes"), sd=parseDateMDY(s.senDate), raw=(s.senDate||"").trim();
   $("senR").classList.toggle("bad",!!raw&&!sd); $("senR").textContent=raw?(sd?fmtD(sd)+", "+sd.getFullYear():"Check the month, day and 4-digit year"):"";
-  if(!sd){el.innerHTML=`<p class="hint">Enter your seniority date to see your vacation.</p>`;return;}
-  const today=new Date(), yrs=yrsBetween(sd,today), div=vacDivisor(yrs);
+  const viz=who==="tif"; $("senF").hidden=viz; $("senYrsF").hidden=!viz;
+  const yv=String(s.senYrs??"").trim();
+  if(viz?(yv===""||isNaN(+yv)):!sd){el.innerHTML=`<p class="hint">${viz?"Enter years of seniority to see your vacation.":"Enter your seniority date to see your vacation."}</p>`;return;}
+  const today=new Date(), yrs=viz?Math.max(0,Math.floor(+yv)):yrsBetween(sd,today), div=vacDivisor(yrs);
+  const nextT=[5,10,15,20,25].find(t=>t>yrs);
   const H=s.holD||[], wk=[0,0], hrsW=[0,0];
   for(let k=0;k<14;k++){
     const w=k<7?0:1, i=k%7, d=c.days[k]||{};
     let worked=(+s.hours[k]||0)+(+(s.otD||[])[k]||0);
     if(s.shift3)worked=worked*8/6.5;
-    const paid=worked+(+(s.pto||[])[k]||0)+((H[k]&&i<5)?8:0);
-    wk[w]+=paid; hrsW[w]+=paid;
+    // Only hours actually worked earn credit: PTO and holiday pay don't.
+    wk[w]+=worked; hrsW[w]+=worked;
   }
   let sick=Math.max(0,num(s.sickE,0)), toSick=0, toVac=0; const lines=[];
-  wk.forEach((h,w)=>{const cr=r1(h/div); if(sick<40){sick=r1(sick+cr);toSick=r1(toSick+cr);lines.push(`Week ${w+1}: ${+h.toFixed(1)} paid hrs \u2192 ${cr} hrs to sick leave`);}else{toVac=r1(toVac+cr);lines.push(`Week ${w+1}: ${+h.toFixed(1)} paid hrs \u2192 ${cr} hrs to vacation`);}});
-  const bal=s.vacBal!==""&&s.vacBal!=null?r1(num(s.vacBal,0)+toVac):null;
+  wk.forEach((h,w)=>{const cr=r1(h/div); if(sick<40){sick=r1(sick+cr);toSick=r1(toSick+cr);lines.push(`Week ${w+1}: ${+h.toFixed(1)} hrs worked \u2192 ${cr} hrs to sick leave`);}else{toVac=r1(toVac+cr);lines.push(`Week ${w+1}: ${+h.toFixed(1)} hrs worked \u2192 ${cr} hrs to vacation`);}});
+  const ptoUsed=r1((s.pto||[]).reduce((a,v)=>a+(+v||0),0));
+  const bal=s.vacBal!==""&&s.vacBal!=null?r1(num(s.vacBal,0)+toVac-ptoUsed):null;
   // projection to the next anniversary at this period's pace (sick leave resets then)
-  let ann=new Date(today.getFullYear(),sd.getMonth(),sd.getDate()); if(ann<=today)ann=new Date(today.getFullYear()+1,sd.getMonth(),sd.getDate());
-  const weeksLeft=Math.max(0,Math.floor((dayN(ann)-dayN(today))/7)), avg=(wk[0]+wk[1])/2, crW=r1(avg/div);
+  let ann=null; if(!viz){ann=new Date(today.getFullYear(),sd.getMonth(),sd.getDate()); if(ann<=today)ann=new Date(today.getFullYear()+1,sd.getMonth(),sd.getDate());}
+  const weeksLeft=viz?52:Math.max(0,Math.floor((dayN(ann)-dayN(today))/7)), avg=(wk[0]+wk[1])/2, crW=r1(avg/div);
   let ps=sick, pv=0; for(let n=0;n<weeksLeft;n++){if(ps<40)ps=r1(ps+crW);else pv=r1(pv+crW);}
   const sickFull=num(s.sickE,0)>=40;
-  const tot=+(wk[0]+wk[1]).toFixed(1), src=(who==="mel"&&CAL)?`Based on your Paycheck hours: <b>${fmtD(CAL.start)} \u2013 ${fmtD(CAL.end)}</b> (${tot} paid hrs)`:`Based on your Visualize hours (${tot} paid hrs)`;
+  const tot=+(wk[0]+wk[1]).toFixed(1), src=(who==="mel"&&CAL)?`Based on your Paycheck hours: <b>${fmtD(CAL.start)} \u2013 ${fmtD(CAL.end)}</b> (${tot} hrs worked)`:`Based on your Visualize hours (${tot} hrs worked)`;
   el.innerHTML=`<p class="vsrc">${src}</p><div class="hbig"><div class="otw"><span>Vacation this period</span><b>${toVac}</b><small>hrs</small></div><div class="pto"><span>Sick leave this period</span><b>${toSick}</b><small>hrs \u00b7 ${r1(sick)} of 40 this year</small></div>`+
-    `<div><span>Vacation balance after</span><b>${bal===null?"\u2013":bal}</b><small>${bal===null?"add your balance above":"hrs"}</small></div><div><span>Your rate</span><b>1 / ${div}</b><small>${yrs} yrs seniority \u00b7 1 hr per ${div} paid</small></div></div>`+
+    `<div><span>Vacation balance after</span><b>${bal===null?"\u2013":bal}</b><small>${bal===null?"add your balance above":`${num(s.vacBal,0)} + ${toVac} earned${ptoUsed?` \u2212 ${ptoUsed} PTO used`:""}`}</small></div><div><span>Your rate</span><b>1 / ${div}</b><small>${yrs} yrs seniority \u00b7 1 hr per ${div} worked</small></div></div>`+
     `<p class="daydet">${lines.join("<br>")}</p>`+
-    `<div class="hsum"><span>By ${fmtD(ann)}, ${ann.getFullYear()} at this pace</span><span>+${pv} hrs vacation</span></div>`+
-    `<p class="hint" style="margin-top:8px">${sickFull?"Your sick leave is full for the year, so all credit goes to vacation.":"Sick leave fills to 40 hrs first, then credit goes to vacation."} Sick leave starts over on your anniversary (${fmtD(ann)}): the first 40 hrs after that go to sick leave.${yrs<5?` At 5 years (${fmtD(new Date(sd.getFullYear()+5,sd.getMonth(),sd.getDate()))}, ${sd.getFullYear()+5}) your rate improves to 1 per 16.`:""}</p>`;
+    `<div class="hsum"><span>${viz?"A full year at this pace":`By ${fmtD(ann)}, ${ann.getFullYear()} at this pace`}</span><span>+${pv} hrs vacation</span></div>`+
+    `<p class="hint" style="margin-top:8px">${sickFull?"Your sick leave is full for the year, so all credit goes to vacation.":"Sick leave fills to 40 hrs first, then credit goes to vacation."} Only hours worked earn credit; PTO and holiday pay don't. PTO you enter on the Paycheck tab is taken out of your vacation balance. ${viz?`Sick leave starts over each year on your anniversary: the first 40 hrs go to sick leave.${nextT?` At ${nextT} years the rate improves to 1 per ${vacDivisor(nextT)}.`:""}`:`Sick leave starts over on your anniversary (${fmtD(ann)}): the first 40 hrs after that go to sick leave.${yrs<5?` At 5 years (${fmtD(new Date(sd.getFullYear()+5,sd.getMonth(),sd.getDate()))}, ${sd.getFullYear()+5}) your rate improves to 1 per 16.`:""}`}</p>`;
 }
 function stampHolidays(){if(!CAL)return;DEF.forEach((_,k)=>{if(HOLIDAYS.has(CAL.dates[k]))$("hd"+k).setAttribute("aria-pressed","true");});}
 // Day rules: no regular hours on Sat, Sun or holidays; regular is capped at 8 minus PTO.
@@ -928,7 +934,7 @@ const INFO={
   hLunch:"Check this if you worked through your lunch and claimed it. Your lunch time is then paid instead of taken out, which adds it as overtime (0.5 hrs for a 30-minute lunch). Leave it unchecked if you took your normal unpaid lunch.",
   senM:"Your seniority date sets your vacation rate. Find it with your leave balances in your timekeeping system. Enter the month, day and 4-digit year, like 1 / 13 / 2023.",
   sickE:"Sick leave earned since your last eligibility date. Find it with your sick leave balance in your timekeeping system (earned since your eligibility date). Once it reaches 40, everything you earn goes to vacation.",
-  vacBal:"Optional. Your current vacation hours, from your timekeeping system. The calculator adds this period's vacation to it.",
+  vacBal:"Optional. Your current vacation hours, from your timekeeping system. The calculator adds this period's vacation to it and subtracts any PTO you entered on the Paycheck tab.",
   shift3:"On 3rd shift, each hour worked counts as 8/6.5 hours toward vacation and sick credit.",
   step2:"Only check this if Step 2 on your W-4 is checked (multiple jobs, or your spouse works). Your employer then withholds more federal tax from each check. You can see your W-4 on your employee pay portal."
 };
@@ -1095,10 +1101,10 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=14;
+const NOTES_VERSION=15;
 const NOTES=[
-  "Visualize has its own dreamy look, so you always know it's a what-if and not your real check",
-  "Presets can now be edited: tap Edit presets to save your own hours, rename, update or delete any preset"
+  "Vacation: only hours worked earn vacation now (PTO and holiday pay don't), and PTO you enter comes off your vacation balance",
+  "Visualize: the Vacation tab asks for years of seniority, so you can see what you'd earn at any point in your career"
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

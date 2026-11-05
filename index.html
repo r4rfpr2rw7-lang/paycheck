@@ -66,6 +66,8 @@ input:focus-visible,select:focus-visible,button:focus-visible,[role=button]:focu
 .qafter[hidden]{display:none}
 .qafter b{font-size:20px;white-space:nowrap}
 .qafter small{display:block;color:var(--muted);font-size:12.5px}
+.asofh{margin:-6px 0 12px;font-size:13.5px}
+.asofh[hidden]{display:none}
 .sicktog{background:none;border:0;color:var(--accent);font:700 13px var(--f-body);text-decoration:underline;cursor:pointer;padding:2px 0 8px;display:block}
 .sicktog[hidden]{display:none}
 .days{display:grid;grid-template-columns:58px repeat(7,minmax(0,1fr));gap:5px 5px;margin-bottom:6px;align-items:center}
@@ -400,7 +402,8 @@ td{font-weight:600}
       <p class="label">This check</p>
       <label class="check" id="duesRow"><input type="checkbox" id="dues" checked> <span>Union dues + MNPL come out this check (every other check)</span></label>
       <p class="hint" id="duesAuto" hidden></p>
-      <div class="row"><div class="field"><label for="q160h">Quarter OT before this pay period</label><input id="q160h" type="number" step="0.5" min="0" placeholder="0"></div></div>
+      <div class="row"><div class="field"><label for="q160h">Quarter OT (Current Quarter Hours)</label><input id="q160h" type="number" step="0.5" min="0" placeholder="0"></div></div>
+      <p class="hint asofh" id="asOfQ" hidden></p>
       <p class="qafter" id="qAfter" hidden></p>
       <p class="hint qend" id="qRollNote" hidden></p>
       <p class="hint qend" id="qEndNote" hidden></p>
@@ -463,16 +466,17 @@ td{font-weight:600}
   </section>
   <section class="panel hourspanel" id="vacTab" hidden>
     <p class="label">Your vacation info</p>
+    <p class="hint asofh" id="asOfV" hidden></p>
     <div class="row">
       <div class="field" id="senF"><label for="senM">Seniority date</label><div class="mdy"><input id="senM" type="text" inputmode="numeric" maxlength="2" autocomplete="off" placeholder="MM" aria-label="Seniority month"><span>/</span><input id="senD" type="text" inputmode="numeric" maxlength="2" autocomplete="off" placeholder="DD" aria-label="Seniority day"><span>/</span><input id="senY" type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="YYYY" aria-label="Seniority year"></div><small class="tread" id="senR"></small></div>
       <div class="field" id="senYrsF" hidden><label for="senYrs">Years of seniority</label><input id="senYrs" type="number" inputmode="numeric" step="1" min="0" max="50" placeholder="Like 5"></div>
-      <div class="field"><label for="sickE">Sick leave earned this year (hrs)</label><input id="sickE" type="number" step="0.1" min="0" placeholder="0"></div>
-      <div class="field"><label for="vacBal">Vacation balance now (hrs)</label><input id="vacBal" type="number" step="0.1" min="0" placeholder="0"></div>
-      <div class="field"><label for="sickBal">Sick leave balance now (hrs)</label><input id="sickBal" type="number" step="0.1" min="0" placeholder="0"></div>
+      <div class="field"><label for="sickE">Sick earned since eligibility date</label><input id="sickE" type="number" step="0.1" min="0" placeholder="0"></div>
+      <div class="field"><label for="vacBal">Vacation hours balance</label><input id="vacBal" type="number" step="0.1" min="0" placeholder="0"></div>
+      <div class="field"><label for="sickBal">Sick hours balance</label><input id="sickBal" type="number" step="0.1" min="0" placeholder="0"></div>
     </div>
     <label class="check"><input type="checkbox" id="shift3"> <span>I work 3rd shift</span></label>
     <div class="hres" id="vRes"></div>
-    <p class="hint">Uses the hours on your Paycheck tab for this pay period. Every paid hour counts once (overtime counts as a regular hour), including PTO and holiday pay. Credit goes to sick leave first until you've earned 40 hours for the year, then to vacation.</p>
+    <p class="hint">Uses the hours on your Paycheck tab for this pay period. Every hour worked counts once (overtime counts as a regular hour). Vacation, sick and holiday pay don't earn credit. Credit goes to sick leave first until you've earned 40 hours for the year, then to vacation.</p>
   </section>
   <p class="sign">Built on the line, for the line.</p>
   <p class="legal">Estimate only. Your paystub and timekeeping records are the official numbers. Not affiliated with, or endorsed by, any employer or union. Not tax, legal or financial advice. Provided as-is, with no guarantee of accuracy. Your numbers stay on your device; nothing is sent anywhere.</p>
@@ -603,13 +607,14 @@ function calc(p){
   const P=Array.from({length:14},(_,k)=>ptoAt(p,k)), H=p.holD||[];
   // 160-hr rule, day by day in pay-period order (Fri → Thu, week 1 then week 2).
   // All OT counts toward 160 (holidays too); 1.5× hours past 160 become 2×.
-  let cum=Math.max(0,p.q160h!==undefined?num(p.q160h,0):(p.q160?160:0)); const q0=cum; const days=[]; let qReset=false, qAt=0;
+  let cum=p.q160h!==undefined?starts(p).q:(p.q160?160:0); const q0=cum; const days=[], qWk=[]; let qReset=false, qAt=0;
   for(const w of [0,7]) for(const i of ORDER){
     const k=w+i, d=dayPay(i,(+p.hours[k]||0)+(+(p.otD||[])[k]||0),P[k],H[k]);
     // Budget quarter ends inside this period: the count restarts at 0 the day after
     if(cal&&cal.qOff!==null&&!qReset&&w+ORDER.indexOf(i)>cal.qOff){qAt=cum;cum=0;qReset=true;}
     const keep=Math.min(d.ot,Math.max(0,160-cum)); d.dt+=d.ot-keep; d.ot=keep; cum+=d.ot+d.dt+d.holW;
     days[k]=d; st+=d.st;pto+=d.pto;ot+=d.ot;dt+=d.dt;holH+=d.holH;holW+=d.holW;worked+=d.worked;
+    if(i===ORDER[6])qWk[w/7]=cum;
   }
   const qEnd=cum;
   // Older pay-period totals (saved before per-day boxes) still count
@@ -640,7 +645,7 @@ function calc(p){
   const dues=cal?((cal.duesOn?duesM:0)+(cal.mnplOn?mnplM:0)):(p.dues?duesM+mnplM:0);
   const loan=+p.loan||0;
   const net=gross-med-k-fed-fica-pfml-ltc-lni-dues-loan-oPost-espp-kR-kA;
-  return {kR,kA,cal,qReset,qAt,espp,esppPct,days,q0,qEnd,oPre,oPost,credit,st,pto,ot,dt,leave,holH,holW,holPay,worked,r,stPay,otPay,dtPay,gross,k,ftg,fedBase,fed,med,ytd,room,ss,mc,mcAdd,fica,pfml,ltc,lni,duesM,mnplM,dues,loan,net};
+  return {kR,kA,cal,qReset,qAt,qWk,espp,esppPct,days,q0,qEnd,oPre,oPost,credit,st,pto,ot,dt,leave,holH,holW,holPay,worked,r,stPay,otPay,dtPay,gross,k,ftg,fedBase,fed,med,ytd,room,ss,mc,mcAdd,fica,pfml,ltc,lni,duesM,mnplM,dues,loan,net};
 }
 
 function read(){
@@ -814,20 +819,24 @@ function renderVac(s,c){
     // Only hours actually worked earn credit: PTO and holiday pay don't.
     wk[w]+=worked; hrsW[w]+=worked;
   }
-  let sick=Math.max(0,num(s.sickE,0)), toSick=0, toVac=0; const lines=[];
-  wk.forEach((h,w)=>{const cr=r1(h/div); if(sick<40){sick=r1(sick+cr);toSick=r1(toSick+cr);lines.push(`Week ${w+1}: ${+h.toFixed(1)} hrs worked \u2192 ${cr} hrs to sick leave`);}else{toVac=r1(toVac+cr);lines.push(`Week ${w+1}: ${+h.toFixed(1)} hrs worked \u2192 ${cr} hrs to vacation`);}});
-  const ptoUsed=r1((s.pto||[]).reduce((a,v)=>a+(+v||0),0)), sickUsed=r1((s.sickD||[]).reduce((a,v)=>a+(+v||0),0));
-  const bal=s.vacBal!==""&&s.vacBal!=null?r1(num(s.vacBal,0)+toVac-ptoUsed):null;
-  const sbal=s.sickBal!==""&&s.sickBal!=null?r1(num(s.sickBal,0)+toSick-sickUsed):null;
+  const st0=starts(s); let sick=st0.sickE, toSick=0, toVac=0; const lines=[];
+  const perV=[0,0],perS=[0,0];
+  wk.forEach((h,w)=>{const cr=r1(h/div); if(sick<40){sick=r1(sick+cr);toSick=r1(toSick+cr);perS[w]=cr;lines.push(`Week ${w+1}: ${+h.toFixed(1)} hrs worked \u2192 ${cr} hrs to sick leave`);}else{toVac=r1(toVac+cr);perV[w]=cr;lines.push(`Week ${w+1}: ${+h.toFixed(1)} hrs worked \u2192 ${cr} hrs to vacation`);}});
+  const ptoUsed=r1((s.pto||[]).reduce((a,v)=>a+(+v||0),0)*vacX(s)), sickUsed=r1((s.sickD||[]).reduce((a,v)=>a+(+v||0),0));
+  const bal=st0.vac!==null?r1(st0.vac+toVac-ptoUsed):null;
+  const wi=(!viz&&CAL&&(s.periodId||CAL.id)===CAL.id)?weekIdx():1, vx=vacX(s);
+  const vWk=w=>r1(perV[w]-wkSum(s.pto,w)*vx), sWk=w=>r1(perS[w]-wkSum(s.sickD,w));
+  const balW=st0.vac!==null?r1(st0.vac+vWk(0)+(wi?vWk(1):0)):null, sbalW=st0.sick!==null?r1(st0.sick+sWk(0)+(wi?sWk(1):0)):null;
+  const sbal=st0.sick!==null?r1(st0.sick+toSick-sickUsed):null;
   const lr=s.lRoll, rollNote=(!viz&&CAL&&lr&&lr.to===CAL.id)?(()=>{const [y,m,d]=lr.from.split("-").map(Number),os=new Date(y,m-1,d);return `<p class="hint vroll">Updated by itself from ${fmtD(os)} – ${fmtD(addD(os,13))}: vacation +${lr.toV} earned − ${lr.vacUsed} used, sick leave +${lr.toS} earned − ${lr.sickUsed} used${lr.reset?". Your anniversary passed, so sick leave earned this year started over":""}.</p>`;})():"";
   // projection to the next anniversary at this period's pace (sick leave resets then)
   let ann=null; if(!viz){ann=new Date(today.getFullYear(),sd.getMonth(),sd.getDate()); if(ann<=today)ann=new Date(today.getFullYear()+1,sd.getMonth(),sd.getDate());}
   const weeksLeft=viz?52:Math.max(0,Math.floor((dayN(ann)-dayN(today))/7)), avg=(wk[0]+wk[1])/2, crW=r1(avg/div);
   let ps=sick, pv=0; for(let n=0;n<weeksLeft;n++){if(ps<40)ps=r1(ps+crW);else pv=r1(pv+crW);}
-  const sickFull=num(s.sickE,0)>=40;
+  const sickFull=st0.sickE>=40;
   const tot=+(wk[0]+wk[1]).toFixed(1), src=(who==="mel"&&CAL)?`Based on your Paycheck hours: <b>${fmtD(CAL.start)} \u2013 ${fmtD(CAL.end)}</b> (${tot} hrs worked)`:`Based on your Visualize hours (${tot} hrs worked)`;
   el.innerHTML=`<p class="vsrc">${src}</p><div class="hbig"><div class="otw"><span>Vacation this period</span><b>${toVac}</b><small>hrs</small></div><div class="pto"><span>Sick leave this period</span><b>${toSick}</b><small>hrs \u00b7 ${r1(sick)} of 40 this year</small></div>`+
-    `<div><span>Vacation balance after</span><b>${bal===null?"\u2013":bal}</b><small>${bal===null?"add your balance above":`${num(s.vacBal,0)} + ${toVac} earned${ptoUsed?` \u2212 ${ptoUsed} used`:""}`}</small></div><div><span>Sick balance after</span><b>${sbal===null?"\u2013":sbal}</b><small>${sbal===null?"add your balance above":`${num(s.sickBal,0)} + ${toSick} earned${sickUsed?` \u2212 ${sickUsed} used`:""}`}</small></div></div>`+
+    `<div><span>Vacation at end of pay period</span><b>${bal===null?"–":bal}</b><small>${bal===null?"add your balance above":viz?`+${toVac} earned${ptoUsed?` − ${ptoUsed} used`:""}`:(wi===0?`after this week: ${balW}`:`this week +${perV[1]} earned${wkSum(s.pto,1)?` − ${r1(wkSum(s.pto,1)*vx)} used`:""}`)}</small></div><div><span>Sick at end of pay period</span><b>${sbal===null?"–":sbal}</b><small>${sbal===null?"add your balance above":viz?`+${toSick} earned${sickUsed?` − ${sickUsed} used`:""}`:(wi===0?`after this week: ${sbalW}`:`this week +${perS[1]} earned${wkSum(s.sickD,1)?` − ${r1(wkSum(s.sickD,1))} used`:""}`)}</small></div></div>`+
     `<p class="daydet">Your rate: 1 hr per ${div} worked (${yrs} yrs seniority)<br>${lines.join("<br>")}</p>`+rollNote+
     `<div class="hsum"><span>${viz?"A full year at this pace":`By ${fmtD(ann)}, ${ann.getFullYear()} at this pace`}</span><span>+${pv} hrs vacation</span></div>`+
     `<p class="hint" style="margin-top:8px">${sickFull?"Your sick leave is full for the year, so all credit goes to vacation.":"Sick leave fills to 40 hrs first, then credit goes to vacation."} Only hours worked earn credit; vacation, sick and holiday pay don't. Vacation and Sick hours you enter on the Paycheck tab come out of those balances. ${viz?`Sick leave starts over each year on your anniversary: the first 40 hrs go to sick leave.${nextT?` At ${nextT} years the rate improves to 1 per ${vacDivisor(nextT)}.`:""}`:`Sick leave starts over on your anniversary (${fmtD(ann)}): the first 40 hrs after that go to sick leave.${yrs<5?` At 5 years (${fmtD(new Date(sd.getFullYear()+5,sd.getMonth(),sd.getDate()))}, ${sd.getFullYear()+5}) your rate improves to 1 per 16.`:""}`}</p>`;
@@ -862,7 +871,7 @@ function flashGrid(moved){
 }
 function render(){renderQEnd();
   const moved=normalizeDays(); if(document.activeElement&&/^[hop]\d+$/.test(document.activeElement.id||""))flashGrid(moved);
-  read();renderQRoll();renderSick();
+  read();renderQRoll();renderSick();renderAsOfHint();
   const s=state[who];
   // Pay calendar (Current only): first time, stamp this period's union holidays
   if(who==="mel"&&CAL){
@@ -871,7 +880,8 @@ function render(){renderQEnd();
     DEF.forEach((_,k)=>{if(HOLIDAYS.has(CAL.dates[k]))s.holD[k]=true;});
   }
   const c=calc(s);
-  {const qa=$("qAfter"),on=who==="mel"&&!!CAL;qa.hidden=!on;if(on){const v=+c.qEnd.toFixed(1);qa.innerHTML=`<span>Quarter OT after this pay period${c.qReset?`<small>Old quarter ended at ${+c.qAt.toFixed(1)} hrs; this is the new quarter</small>`:(v>=160?`<small>Past 160: extra OT pays 2×</small>`:`<small>${+(160-v).toFixed(1)} hrs to go until 160</small>`)}</span><b>${v} hrs</b>`;}}
+  {const qa=$("qAfter"),on=who==="mel"&&!!CAL&&(s.periodId||CAL.id)===CAL.id;qa.hidden=!on;if(on){const wi=weekIdx(),v=+c.qWk[wi].toFixed(1),pe=+c.qEnd.toFixed(1);
+    qa.innerHTML=`<span>Quarter OT at end of pay period<small>${pe>=160?"Past 160: extra OT pays 2×":`${+(160-pe).toFixed(1)} hrs to go until 160`}${wi===0?` · after this week: ${v}`:""}${c.qReset?" · new quarter started this period":""}</small></span><b>${pe} hrs</b>`;}}
   $("copyCurRow").hidden=who!=="tif";
   $("presets").hidden=who==="mel";   // presets are for what-ifs only
   renderCal(s);
@@ -955,13 +965,13 @@ const INFO={
   mnpl:"Machinists Non-Partisan Political League, the union's voluntary political fund. On your stub it comes out every other check. Put 0 if you don't contribute.",
   ytd:"The year-to-date gross on your most recent stub, before the check you're figuring. Only matters near the yearly limits: Social Security stops at $184,500 and an extra 0.9% Medicare starts over $200,000.",
   dues:"Dues and MNPL come out every other check. From the paystubs checked so far, union dues come out of the first check of the month and MNPL out of the second. A third check in the same month has neither (and no medical either). ⚠ Based on a few stubs, not yet confirmed.",
-  q160h:"Your quarter overtime hours before this pay period started. Find it with your overtime balances in your timekeeping system (current quarter hours). On Current you only need to enter it once: when a new pay period starts and you tap Start new period or Keep hours, it adds the last period's overtime by itself (and restarts at 0 when a quarter ends). Check it against your timekeeping system now and then. If you check it mid-period, it already includes this period's first week, so subtract the overtime from the days already in your grid. Once you pass 160, every extra overtime hour that quarter pays 2×, and the calculator switches at the exact hour. Leave it blank if you're nowhere near 160. It resets to 0 when a new quarter starts.",
+  q160h:"Copy Current Quarter Hours from the Overtime Summary on your timekeeping page, exactly as it shows. The page updates weekly (as of the end of last week), and the calculator knows which week that is. Below it you'll see your quarter OT after this week. After that you don't need to touch it: when a new pay period starts and you tap Start new period or Keep hours, it adds the last period's overtime by itself (and restarts at 0 when a quarter ends). Once you pass 160, every extra overtime hour that quarter pays 2×, and the calculator switches at the exact hour.",
   hLunch:"Check this if you worked through your lunch and claimed it. Your lunch time is then paid instead of taken out, which adds it as overtime (0.5 hrs for a 30-minute lunch). Leave it unchecked if you took your normal unpaid lunch.",
   senM:"Your seniority date sets your vacation rate. Find it with your leave balances in your timekeeping system. Enter the month, day and 4-digit year, like 1 / 13 / 2023.",
-  sickE:"Sick leave earned since your last eligibility date. Find it with your sick leave balance in your timekeeping system (earned since your eligibility date). Once it reaches 40, everything you earn goes to vacation.",
-  vacBal:"Optional. Your current vacation hours, from your timekeeping system. The calculator adds this period's vacation to it and subtracts the vacation hours you entered on the Paycheck tab. On Current you only enter it once: it carries forward by itself each new pay period.",
-  sickBal:"Optional. Your current sick leave hours, from your timekeeping system. The calculator adds the sick leave you earn and subtracts the sick hours you entered on the Paycheck tab. On Current it carries forward by itself each new pay period.",
-  shift3:"On 3rd shift, each hour worked counts as 8/6.5 hours toward vacation and sick credit.",
+  sickE:"Copy Earned Since Eligibility Date from the Sick Leave box on your timekeeping page. Once it reaches 40, everything you earn goes to vacation. It starts over on your anniversary date.",
+  vacBal:"Optional. Copy Hours Balance from the Vacation box on your timekeeping page. The page updates weekly; the calculator knows which week that is and shows your balance after this week. It adds this period's vacation and takes out the vacation hours you enter on the Paycheck tab. On Current it carries forward by itself each new pay period.",
+  sickBal:"Optional. Copy Hours Balance from the Sick Leave box on your timekeeping page. The calculator adds the sick leave you earn and takes out the sick hours you enter on the Paycheck tab. On Current it carries forward by itself each new pay period.",
+  shift3:"On 3rd shift, each hour worked counts as 8/6.5 hours toward vacation and sick credit, and a full 6.5-hour vacation day takes 8 hours from your balance.",
   step2:"Only check this if Step 2 on your W-4 is checked (multiple jobs, or your spouse works). Your employer then withholds more federal tax from each check. You can see your W-4 on your employee pay portal."
 };
 Object.entries(INFO).forEach(([id,txt])=>{
@@ -1084,7 +1094,41 @@ function clearDays(){
 
 
 
+
+// Timekeeping page numbers are weekly ("as of" a Thursday). If they're as of the end of week 1,
+// back week 1 out so everything starts from the beginning of this pay period.
+const vacX=s=>s.shift3?8/6.5:1;   // 3rd shift: a 6.5-hr vacation day takes 8 from the balance
+// The timekeeping page updates weekly, for everyone at once, "as of" the end of last week.
+// s.anch = the Friday that starts the week those numbers were copied in (they cover everything before it).
+// If that's week 2 of the pay period, week 1 is already in them, so it's backed out here.
+function weekIdx(){if(!CAL)return 0;return dayN(new Date())-dayN(CAL.start)>=7?1:0;}
+function asOfWk1(s){if(s!==state.mel||!CAL)return false;const anch=s.anch||ymd(addD(CAL.start,7*weekIdx())),pid=s.periodId||CAL.id,[y,m,d]=pid.split("-").map(Number);return anch===ymd(addD(new Date(y,m-1,d),7));}
+["q160h","vacBal","sickBal","sickE"].forEach(id=>$(id).addEventListener("input",()=>{if(who!=="mel"||!CAL||(state.mel.periodId||CAL.id)!==CAL.id)return;state.mel.anch=ymd(addD(CAL.start,7*weekIdx()));render();}));
+function wkOT(s,w){let t=0;for(const i of ORDER){const k=w*7+i,d=dayPay(i,(+s.hours[k]||0)+(+(s.otD||[])[k]||0),ptoAt(s,k),(s.holD||[])[k]);t+=d.ot+d.dt+d.holW;}return r1(t);}
+function wkWorked(s,w){let t=0;for(let k=w*7;k<w*7+7;k++)t+=(+s.hours[k]||0)+(+(s.otD||[])[k]||0);return s.shift3?t*8/6.5:t;}
+function wkSum(a,w){let t=0;for(let k=w*7;k<w*7+7;k++)t+=+(a||[])[k]||0;return t;}
+function starts(s){
+  const blank=v=>v===""||v==null;
+  const raw={q:Math.max(0,num(s.q160h,0)),sickE:Math.max(0,num(s.sickE,0)),vac:blank(s.vacBal)?null:num(s.vacBal,0),sick:blank(s.sickBal)?null:num(s.sickBal,0)};
+  if(!asOfWk1(s))return raw;
+  const o={...raw}; o.q=Math.max(0,r1(raw.q-wkOT(s,0)));
+  let cS=0,cV=0; const sd=parseDateMDY(s.senDate);
+  if(sd){const [y,m,d]=(s.periodId||CAL.id).split("-").map(Number),cr=r1(wkWorked(s,0)/vacDivisor(yrsBetween(sd,new Date(y,m-1,d))));
+    if(raw.sickE-cr<40){cS=cr;o.sickE=Math.max(0,r1(raw.sickE-cr));}else cV=cr;}
+  if(o.vac!==null)o.vac=r1(raw.vac-cV+wkSum(s.pto,0)*vacX(s));
+  if(o.sick!==null)o.sick=r1(raw.sick-cS+wkSum(s.sickD,0));
+  return o;
+}
 // Sick row stays tucked away until someone needs it (or already has sick hours entered).
+
+function renderAsOfHint(){
+  const on=who==="mel"&&!!CAL&&(state.mel.periodId||CAL.id)===CAL.id;
+  const d=on?addD(CAL.start,7*weekIdx()-1):null;
+  $("asOfQ").hidden=!on; $("asOfV").hidden=!on; if(!on)return;
+  const dt=`<b>as of ${fmtD(d)}</b>`;
+  $("asOfQ").innerHTML=`Use Current Quarter Hours from the Overtime Summary on your timekeeping page, ${dt}.`;
+  $("asOfV").innerHTML=`Use the numbers from your timekeeping page, ${dt}: Sick Leave (Hours Balance and Earned Since Eligibility Date) and Vacation (Hours Balance).`;
+}
 function renderSick(){
   const s=state[who], has=(s.sickD||[]).some(v=>+v>0), show=!!s.showSick||has;
   $("days1").classList.toggle("nosick",!show); $("days2").classList.toggle("nosick",!show);
@@ -1095,8 +1139,8 @@ $("sickTog").onclick=()=>{const s=state[who];s.showSick=!s.showSick;renderSick()
 function rollLeave(){
   const s=state.mel; if(!CAL||!s.periodId||s.periodId===CAL.id)return;
   const [y,m,d]=s.periodId.split("-").map(Number), os=new Date(y,m-1,d), osN=dayN(os), gapN=dayN(CAL.start)-osN;
-  const tot=a=>r1((a||[]).reduce((x,v)=>x+(+v||0),0)), vacUsed=tot(s.pto), sickUsed=tot(s.sickD);
-  const sd=parseDateMDY(s.senDate); let sickE=Math.max(0,num(s.sickE,0)), toS=0, toV=0, reset=false;
+  const tot=a=>r1((a||[]).reduce((x,v)=>x+(+v||0),0)), vacUsed=r1(tot(s.pto)*vacX(s)), sickUsed=tot(s.sickD), st0=starts(s);
+  const sd=parseDateMDY(s.senDate); let sickE=st0.sickE, toS=0, toV=0, reset=false;
   if(sd){
     const div=vacDivisor(yrsBetween(sd,addD(os,13)));
     let aOff=null; for(const Y of [os.getFullYear(),os.getFullYear()+1]){const o=dayN(new Date(Y,sd.getMonth(),sd.getDate()))-osN;if(o>=0&&o<gapN&&aOff===null)aOff=o;}
@@ -1109,8 +1153,8 @@ function rollLeave(){
     if(aOff!==null&&!reset){sickE=0;reset=true;}
     s.sickE=String(sickE); $("sickE").value=sickE;
   }
-  if(s.vacBal!==""&&s.vacBal!=null){s.vacBal=String(r1(num(s.vacBal,0)+toV-vacUsed));$("vacBal").value=s.vacBal;}
-  if(s.sickBal!==""&&s.sickBal!=null){s.sickBal=String(r1(num(s.sickBal,0)+toS-sickUsed));$("sickBal").value=s.sickBal;}
+  if(st0.vac!==null){s.vacBal=String(r1(st0.vac+toV-vacUsed));$("vacBal").value=s.vacBal;}
+  if(st0.sick!==null){s.sickBal=String(r1(st0.sick+toS-sickUsed));$("sickBal").value=s.sickBal;}
   s.lRoll={to:CAL.id,from:s.periodId,toV,toS,vacUsed,sickUsed,reset};
 }
 // Current: roll "Quarter OT before this pay period" forward when a new pay period starts.
@@ -1122,7 +1166,7 @@ function rollQuarter(){
   const [y,m,d]=s.periodId.split("-").map(Number), os=new Date(y,m-1,d), osN=dayN(os);
   const qN=QENDS.map(q=>{const [a,b,c]=q.split("-").map(Number);return dayN(new Date(a,b-1,c));});
   let qOff=null; qN.forEach(n=>{const o=n-osN;if(o>=0&&o<=13)qOff=o;});
-  let q=Math.max(0,num(s.q160h,0)), add=0, reset=false;
+  let q=starts(s).q, add=0, reset=false;
   for(const w of [0,7]) for(const i of ORDER){
     const k=w+i, off=w+ORDER.indexOf(i);
     if(qOff!==null&&!reset&&off>qOff){q=0;reset=true;}
@@ -1141,7 +1185,7 @@ function renderQRoll(){
   el.innerHTML=r.reset?(r.val?`Updated by itself: a new quarter started, so it restarted at 0 and counted only the overtime after the quarter ended (<b>${r.val} hrs</b>).`:`Updated by itself: a new quarter started, so it reset to <b>0</b>.`):`Updated by itself: added <b>${r.add} OT hrs</b> from ${fmtD(os)} – ${fmtD(addD(os,13))}.`;
   el.hidden=false;
 }
-$("npClear").onclick=()=>{read();rollLeave();rollQuarter();clearDays();};
+$("npClear").onclick=()=>{read();rollLeave();rollQuarter();state.mel.anch=CAL.id;clearDays();};
 
 // Visualize: copy Current's setup (pay setup, deductions, shift). Hours stay as they are.
 const SETUP_KEYS=["senDate","sickE","vacBal","sickBal","shift3","rate","k401","k401r","k401a","extra","loan","fs","med","duesAmt","mnpl","ytd","credit","oPre","oPost","espp","step2","hsS","hsE","hsL"];
@@ -1181,16 +1225,18 @@ $("tabPay").onclick=()=>showTab("pay"); $("tabHrs").onclick=()=>showTab("hrs"); 
 [["senM","senD",2],["senD","senY",2]].forEach(([a,b,n])=>$(a).addEventListener("input",()=>{if($(a).value.replace(/\D/g,"").length>=n)$(b).focus();}));
 $("hDay").addEventListener("change",()=>{const k=+$("hDay").value;$("hHol").checked=(who==="mel"&&CAL)?HOLIDAYS.has(CAL.dates[k]):$("hd"+k).getAttribute("aria-pressed")==="true";$("hMsg").textContent="";render();});
 $("hAdd").onclick=()=>{const s=state[who],h=hoursCalc(s);if(!h)return;{const rg=+h.d.st.toFixed(1);$("h"+h.k).value=rg;$("o"+h.k).value=+(h.w-rg).toFixed(1)||"";}$("p"+h.k).value=h.p||"";$("hd"+h.k).setAttribute("aria-pressed",h.hol);selDay=h.k;render();$("hMsg").textContent=`Put on ${dayLabel(h.k)}: ${h.w} hrs worked${h.p?`, ${h.p} PTO`:""}${h.hol?", holiday":""}. Switch to Paycheck to see your check.`;};
-$("npKeep").onclick=()=>{read();rollLeave();rollQuarter();state.mel.periodId=CAL.id;render();};
+$("npKeep").onclick=()=>{read();rollLeave();rollQuarter();state.mel.anch=CAL.id;state.mel.periodId=CAL.id;render();};
 // Keep the calendar on today's date: recheck every minute and whenever the app comes back to the screen
 function tick(){const t=new Date(),c=calFor(t);const changed=!CAL||c.todayYmd!==CAL.todayYmd;CAL=c;if(changed)render();}
 setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=18;
+const NOTES_VERSION=19;
 const NOTES=[
-  "Current now shows your quarter overtime after this pay period, and how many hours are left until 160"
+  "Your timekeeping page updates weekly. Copy Quarter OT, vacation and sick numbers exactly as it shows, as of the date under each box, and the calculator won't count a week twice",
+  "Quarter OT, vacation and sick now show where you'll be at the end of the pay period",
+  "3rd shift: a 6.5-hour vacation day now takes 8 hours from your balance, like the timekeeping system"
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

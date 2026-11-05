@@ -819,7 +819,7 @@ function render(){
   renderHours(s);
   renderVac(s,c);
   const sum=a=>Math.round(a.reduce((x,y)=>x+(+y||0),0)*10+1e-9)/10;
-  const wkT=(a,b)=>{const h=sum(s.hours.slice(a,b)),o=sum((s.otD||[]).slice(a,b)),p=sum((s.pto||[]).slice(a,b));return r1(h+o)+" hrs"+(o?` · ${o} OT`:"")+(p?` · ${p} PTO`:"");};
+  const wkT=(a,b)=>{const h=sum(s.hours.slice(a,b)),o=sum((s.otD||[]).slice(a,b)),p=sum((s.pto||[]).slice(a,b));return `${h} Regular · ${o} OT · ${p} PTO`;};
   $("setupSum").textContent=(+s.rate>0)?`Your setup · $${(+s.rate).toFixed(2)}/hr · 401(k) ${+((+s.k401||0)+(+s.k401r||0)+(+s.k401a||0)).toFixed(2)}% · ${FSN[s.fs]||FSN.mfj}`:"Your setup · start here";
   const noRate=!(+s.rate>0);
   $("sNet").textContent=noRate?"Add your rate":money(c.net); $("sGross").textContent=noRate?"—":money(c.gross);
@@ -1037,9 +1037,9 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=12;
+const NOTES_VERSION=13;
 const NOTES=[
-  'Week totals now round to one decimal, and "2-check month" is now labeled "Month (2 checks)"'
+  'Each week now shows Regular, OT and PTO hours separately'
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

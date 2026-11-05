@@ -876,6 +876,9 @@ function render(){renderQEnd();
   // Pay calendar (Current only): first time, stamp this period's union holidays
   if(who==="mel"&&CAL){
     if(s.periodId===undefined)s.periodId=CAL.id;
+    // Numbers saved before the weekly "as of" logic: pin them to the week they were most likely copied in,
+    // so they don't shift when a new pay period starts. Same pay period: this week. Older period: its 2nd week.
+    if(s.anch===undefined){const [y,m,d]=s.periodId.split("-").map(Number);s.anch=s.periodId===CAL.id?ymd(addD(CAL.start,7*weekIdx())):ymd(addD(new Date(y,m-1,d),7));}
     // Union holidays on the calendar are always marked on Current (locked on)
     DEF.forEach((_,k)=>{if(HOLIDAYS.has(CAL.dates[k]))s.holD[k]=true;});
   }
@@ -1232,7 +1235,7 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=19;
+const NOTES_VERSION=19; // matches the live site (GitHub); bump before the next push
 const NOTES=[
   "Your timekeeping page updates weekly. Copy Quarter OT, vacation and sick numbers exactly as it shows, as of the date under each box, and the calculator won't count a week twice",
   "Quarter OT, vacation and sick now show where you'll be at the end of the pay period",

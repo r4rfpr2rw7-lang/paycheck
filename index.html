@@ -62,6 +62,10 @@ h1{font-family:var(--f-display);font-weight:800;font-size:38px;line-height:.95;l
 input[type=number],input[type=text],select{font:500 16px var(--f-num);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-bottom:1.5px solid var(--muted);border-radius:2px;padding:8px;width:100%}
 input:focus-visible,select:focus-visible,button:focus-visible,[role=button]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .days.nosick .sickc{display:none}
+.qafter{margin:-4px 0 10px;padding:10px 12px;border:2px solid var(--line);border-radius:12px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:15px}
+.qafter[hidden]{display:none}
+.qafter b{font-size:20px;white-space:nowrap}
+.qafter small{display:block;color:var(--muted);font-size:12.5px}
 .sicktog{background:none;border:0;color:var(--accent);font:700 13px var(--f-body);text-decoration:underline;cursor:pointer;padding:2px 0 8px;display:block}
 .sicktog[hidden]{display:none}
 .days{display:grid;grid-template-columns:58px repeat(7,minmax(0,1fr));gap:5px 5px;margin-bottom:6px;align-items:center}
@@ -397,6 +401,7 @@ td{font-weight:600}
       <label class="check" id="duesRow"><input type="checkbox" id="dues" checked> <span>Union dues + MNPL come out this check (every other check)</span></label>
       <p class="hint" id="duesAuto" hidden></p>
       <div class="row"><div class="field"><label for="q160h">Quarter OT before this pay period</label><input id="q160h" type="number" step="0.5" min="0" placeholder="0"></div></div>
+      <p class="qafter" id="qAfter" hidden></p>
       <p class="hint qend" id="qRollNote" hidden></p>
       <p class="hint qend" id="qEndNote" hidden></p>
     </section>
@@ -866,6 +871,7 @@ function render(){renderQEnd();
     DEF.forEach((_,k)=>{if(HOLIDAYS.has(CAL.dates[k]))s.holD[k]=true;});
   }
   const c=calc(s);
+  {const qa=$("qAfter"),on=who==="mel"&&!!CAL;qa.hidden=!on;if(on){const v=+c.qEnd.toFixed(1);qa.innerHTML=`<span>Quarter OT after this pay period${c.qReset?`<small>Old quarter ended at ${+c.qAt.toFixed(1)} hrs; this is the new quarter</small>`:(v>=160?`<small>Past 160: extra OT pays 2×</small>`:`<small>${+(160-v).toFixed(1)} hrs to go until 160</small>`)}</span><b>${v} hrs</b>`;}}
   $("copyCurRow").hidden=who!=="tif";
   $("presets").hidden=who==="mel";   // presets are for what-ifs only
   renderCal(s);
@@ -1182,11 +1188,9 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=17;
+const NOTES_VERSION=18;
 const NOTES=[
-  "Quarter OT, vacation and sick balances now add up by themselves: enter them once, then tap Start new period or Keep hours each new pay period",
-  "PTO is now Vacation, and there's a separate Sick row (tap Add sick hours under the grid). Your old PTO hours are kept as Vacation",
-  "The Vacation tab is now called PTO and tracks both your vacation and sick balances"
+  "Current now shows your quarter overtime after this pay period, and how many hours are left until 160"
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

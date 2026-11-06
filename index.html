@@ -1366,7 +1366,7 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=22;
+const NOTES_VERSION=23;
 const NOTES=[
   "History: tap Edit hours on any past pay period to fix its hours. Pay, quarter OT and PTO recalculate and carry forward to today",
   "History also shows the PTO you earned each pay period",
@@ -1378,6 +1378,19 @@ $("wnOk").onclick=closeNotes;
 $("ackOk").onclick=()=>{ack=true;$("ackBox").hidden=true;save();showNotes();};
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("whatsnew").hidden)closeNotes();});
 CAL=calFor(new Date());
+// Self-update (website only): home-screen apps on iPhone can hold an old copy for a long time.
+// When the app opens or comes back on screen, ask for the newest version without cache; if it's newer, reload once.
+// Saved numbers live on the phone, so a reload never touches them.
+(function(){
+  if(!/github\.io$/.test(location.hostname))return;
+  let busy=false;
+  const check=()=>{if(busy||document.hidden)return;busy=true;
+    fetch(location.pathname+"?check="+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():"").then(t=>{
+      const m=t.match(/const NOTES_VERSION=(\d+)/),v=m?+m[1]:0; let tried=0; try{tried=+sessionStorage.getItem("pc-upd")||0;}catch(e){}
+      if(v>NOTES_VERSION&&v!==tried){try{sessionStorage.setItem("pc-upd",String(v));}catch(e){} try{save();}catch(e){} location.replace(location.pathname+"?v="+v);}
+    }).catch(()=>{}).finally(()=>{busy=false;});};
+  check(); document.addEventListener("visibilitychange",check); window.addEventListener("pageshow",check);
+})();
 load();
 syncToggle();renderMine();
 write(); render();

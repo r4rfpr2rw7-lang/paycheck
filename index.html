@@ -80,7 +80,8 @@ input:focus-visible,select:focus-visible,button:focus-visible,[role=button]:focu
 .hist .hd p.t{font-weight:900}
 .hist .hdel{margin-top:8px;background:none;border:0;color:var(--warn);font:700 13px var(--f-body);text-decoration:underline;cursor:pointer;padding:4px 0}
 .hist .hbtns{display:flex;gap:10px;align-items:center;margin-top:8px}
-.hist .hform[hidden]{display:none}
+.hist .hform[hidden],#histAddBox[hidden]{display:none}
+#histAddBox select{width:100%;margin:6px 0 4px;font-size:15px;padding:8px}
 .hist .hgrid{display:grid;grid-template-columns:52px repeat(4,1fr);gap:4px;align-items:center;margin-top:10px}
 .hist .hgrid span{font-size:12.5px;font-weight:800;color:var(--muted);text-align:center}
 .hist .hgrid span.hdn{text-align:left;font-weight:700}
@@ -488,6 +489,8 @@ td{font-weight:600}
   <section class="panel hourspanel" id="histTab" hidden>
     <p class="label">Past pay periods</p>
     <div id="histList"></div>
+    <button type="button" class="sicktog" id="histAdd">＋ Add a past pay period</button>
+    <div class="hist" id="histAddBox" hidden></div>
   </section>
   <section class="panel hourspanel" id="vacTab" hidden>
     <p class="label">Your vacation info</p>
@@ -819,7 +822,7 @@ function renderHours(s){
 }
 function showTab(t){
   $("tabPay").setAttribute("aria-selected",t==="pay"); $("tabHrs").setAttribute("aria-selected",t==="hrs"); $("tabVac").setAttribute("aria-selected",t==="vac"); $("tabHist").setAttribute("aria-selected",t==="hist");
-  $("payTab").hidden=t!=="pay"; $("hoursTab").hidden=t!=="hrs"; $("vacTab").hidden=t!=="vac"; $("histTab").hidden=t!=="hist"; if(t==="hist")renderHist(); $("hMsg").textContent="";
+  $("payTab").hidden=t!=="pay"; $("hoursTab").hidden=t!=="hrs"; $("vacTab").hidden=t!=="vac"; $("histTab").hidden=t!=="hist"; if(t==="hist"){renderHist();renderHistAdd();} $("hMsg").textContent="";
 }
 // ---- Vacation tab (contract Article 8) ----
 // Weekly credit: 1 hr per N hours worked (PTO and holiday pay excluded) by seniority (<5 yrs 17, 5-10 16, 10-15 13, 15-20 12, 20-25 11, 25+ 10),
@@ -1208,7 +1211,11 @@ function legacyInit(i,vals){
   const s=state.mel,h=s.hist[i],[y,m,d]=h.pid.split("-").map(Number),os=new Date(y,m-1,d);
   const pr=JSON.parse(JSON.stringify(s)); ["hist","myPresets","holStash","qRoll","lRoll","anch"].forEach(k=>delete pr[k]);
   Object.assign(pr,vals); pr.holD=Array(14).fill(false); pr.q160h="0"; pr.vacBal="0"; pr.sickBal="0";
-  pr.sickE=String(num(s.sickE,0)>=40?40:Math.max(0,num(s.sickE,0)));
+  // Sick earned this year at the start: the value that lands on today's number after this period's weeks.
+  const endE=Math.max(0,(i===0&&CAL&&h.pid===ymd(addD(CAL.start,-14)))?starts(s).sickE:num(s.sickE,0)), sd=parseDateMDY(s.senDate);
+  pr.sickE=String(endE);
+  if(sd){const div=vacDivisor(yrsBetween(sd,addD(os,13))),wk=w=>{let t=0;for(let k=w*7;k<w*7+7;k++)t+=(+vals.hours[k]||0)+(+vals.otD[k]||0);return r1((pr.shift3?t*8/6.5:t)/div);};
+    for(const x of [r1(endE-wk(0)),r1(endE-wk(0)-wk(1)),endE]){if(x<0)continue;pr.sickE=String(x);if(Math.abs(histFigures(pr,os).sickEEnd-endE)<0.05)break;pr.sickE=String(endE);}}
   const z=histFigures(pr,os);
   pr.q160h=String(Math.max(0,r1((h.qEnd||0)-z.qEnd)));
   pr.vacBal=h.vacEnd!=null?String(r1(h.vacEnd-z.vacEnd)):""; pr.sickBal=h.sickEnd!=null?String(r1(h.sickEnd-z.sickEnd)):"";
@@ -1216,6 +1223,36 @@ function legacyInit(i,vals){
   if(h.qEnd!=null)s.hist[i].qEnd=h.qEnd; if(h.vacEnd!=null)s.hist[i].vacEnd=h.vacEnd; if(h.sickEnd!=null)s.hist[i].sickEnd=h.sickEnd;
   save();
 }
+
+// Add a past pay period by hand (for periods that ended before History existed, or got cleared).
+function hoursGrid(os,P){const md=x=>x.toLocaleDateString("en-US",{month:"short",day:"numeric"}),v=(a,k)=>{const x=+((P||{})[a]||[])[k]||0;return x?x:"";};
+  let t=`<div class="hgrid"><span></span><span>Reg</span><span>OT</span><span>Vac</span><span>Sick</span>`;
+  for(const w of [0,7])ORDER.forEach((di,j)=>{const k=w+di,dd=addD(os,w+j);t+=`<span class="hdn">${DAYS[di]} ${dd.getDate()}</span>`+["hours","otD","pto","sickD"].map(a=>`<input type="number" inputmode="decimal" step="0.1" min="0" data-a="${a}" data-k="${k}" value="${v(a,k)}" placeholder="0" aria-label="${DAYS[di]} ${md(dd)} ${a}">`).join("");});
+  return t+`</div>`;}
+function gridVals(f){const vals={hours:Array(14).fill(0),otD:Array(14).fill(0),pto:Array(14).fill(0),sickD:Array(14).fill(0)};f.querySelectorAll(".hgrid input").forEach(inp=>{vals[inp.dataset.a][+inp.dataset.k]=Math.max(0,+inp.value||0);});return vals;}
+function renderHistAdd(){
+  const box=$("histAddBox"),btn=$("histAdd"),s=state.mel; btn.hidden=!CAL; if(!CAL){box.hidden=true;return;}
+  if(box.hidden)return;
+  const have=new Set((s.hist||[]).map(h=>h.pid)),opts=[];
+  for(let j=1;j<=6;j++){const st=addD(CAL.start,-14*j),id=ymd(st);if(!have.has(id))opts.push(st);}
+  if(!opts.length){box.innerHTML=`<p class="hint">The last 6 pay periods are already in History.</p>`;return;}
+  const md=x=>x.toLocaleDateString("en-US",{month:"short",day:"numeric"});
+  box.innerHTML=`<label class="mh" for="histAddSel">Which pay period?</label><select id="histAddSel">${opts.map(o=>`<option value="${ymd(o)}">${md(o)} – ${md(addD(o,13))}</option>`).join("")}</select><div class="hf"></div><div class="hbtns"><button type="button" class="mini" id="histAddSave">Save</button><button type="button" class="mini" id="histAddX">Cancel</button></div>`;
+  const draw=()=>{const [y,m,d]=$("histAddSel").value.split("-").map(Number);box.querySelector(".hf").innerHTML=hoursGrid(new Date(y,m-1,d),null);};
+  draw(); $("histAddSel").onchange=draw;
+  $("histAddX").onclick=()=>{box.hidden=true;renderHistAdd();};
+  $("histAddSave").onclick=()=>{
+    const pid=$("histAddSel").value,vals=gridVals(box),[y,m,d]=pid.split("-").map(Number),os=new Date(y,m-1,d);
+    const prev=ymd(addD(CAL.start,-14))===pid, H=s.hist||(s.hist=[]);
+    const e={pid,pay:ymd(calFor(os).pay)};
+    if(prev){const st=starts(s);e.qEnd=st.q;if(st.vac!==null)e.vacEnd=st.vac;if(st.sick!==null)e.sickEnd=st.sick;}
+    H.push(e);H.sort((a,b)=>a.pid<b.pid?1:-1);const i=H.indexOf(e);
+    legacyInit(i,vals);
+    const n=H[i]; if(!prev){delete n.qEnd;delete n.vacEnd;delete n.sickEnd;}
+    n._open=true;n._msg=`Added. Take-home for this period: ${money(n.net)}.${prev?" Your current quarter OT and PTO numbers didn't change.":""}`;
+    s.hist=H.slice(0,26);save();box.hidden=true;renderHist();renderHistAdd();};
+}
+$("histAdd").onclick=()=>{const b=$("histAddBox");b.hidden=!b.hidden;renderHistAdd();};
 // Save edited hours for a past period, then carry the change forward to later periods and today's numbers.
 function saveHistEdit(i,vals){
   const s=state.mel,H=s.hist,h=H[i],[y,m,d]=h.pid.split("-").map(Number),os=new Date(y,m-1,d);
@@ -1235,7 +1272,7 @@ function saveHistEdit(i,vals){
 }
 function renderHist(){
   const L=state.mel.hist||[], el=$("histList"); el.textContent="";
-  if(!L.length){el.innerHTML=`<p class="hint">Nothing yet. When a new pay period starts and you tap Start new period or Keep hours on Current, the one that just ended is saved here.</p>`;return;}
+  if(!L.length){el.innerHTML=`<p class="hint">Nothing yet. When a new pay period starts and you tap Start new period or Keep hours, the one that just ended is saved here.</p>`;return;}
   const box=document.createElement("div"); box.className="hist";
   const md=x=>x.toLocaleDateString("en-US",{month:"short",day:"numeric"});
   L.forEach((h,i)=>{const [y,m,d]=h.pid.split("-").map(Number),os=new Date(y,m-1,d),[py,pm,pd]=h.pay.split("-").map(Number);
@@ -1366,11 +1403,11 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=23;
+const NOTES_VERSION=24;
 const NOTES=[
-  "History: tap Edit hours on any past pay period to fix its hours. Pay, quarter OT and PTO recalculate and carry forward to today",
-  "History also shows the PTO you earned each pay period",
-  "The payday at the top now counts down to your next check, not the one after"
+  "History: missed a pay period? Tap Add a past pay period at the bottom, enter its hours once, and it's saved without changing today's numbers",
+  "History also lets you edit any past period's hours, and shows the PTO you earned each period",
+  "The app now updates itself when a new version comes out"
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

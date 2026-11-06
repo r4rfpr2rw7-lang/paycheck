@@ -73,15 +73,25 @@ input:focus-visible,select:focus-visible,button:focus-visible,[role=button]:focu
 .hist summary::-webkit-details-marker{display:none}
 .hist summary span small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
 .hist summary b{font-size:19px;white-space:nowrap}
-.hist .hd{padding:0 14px 12px}
-.hist .hd p{display:flex;justify-content:space-between;gap:8px;margin:0;padding:5px 0;border-top:1px dotted var(--line);font-size:14.5px;font-weight:600}
-.hist .hd p span:last-child{white-space:nowrap}
-.hist .hd .hh{border-top:0;color:var(--muted);font-size:13.5px}
-.hist .hd p.t{font-weight:900}
+.hist .hdet{padding:0 14px 12px}
+.hist .hdet p{display:flex;justify-content:space-between;gap:8px;margin:0;padding:5px 0;border-top:1px dotted var(--line);font-size:14.5px;font-weight:600}
+.hist .hdet p span:last-child{white-space:nowrap}
+.hist .hdet .hh{border-top:0;color:var(--muted);font-size:13.5px}
+.hist .hdet p.t{font-weight:900}
 .hist .hdel{margin-top:8px;background:none;border:0;color:var(--warn);font:700 13px var(--f-body);text-decoration:underline;cursor:pointer;padding:4px 0}
 .hist .hbtns{display:flex;gap:10px;align-items:center;margin-top:8px}
 .hist .hform[hidden],#histAddBox[hidden]{display:none}
 #histAddBox select{width:100%;margin:6px 0 4px;font-size:15px;padding:8px}
+.hist .hwk{font:900 13px var(--f-body);letter-spacing:.08em;text-transform:uppercase;margin:12px 0 4px}
+.hist .hdays .dn{cursor:default}
+.hist .hdays{grid-template-columns:48px repeat(7,minmax(0,1fr));gap:4px}
+.hist .hdays input{padding:7px 0;font-size:14px;letter-spacing:-.3px;min-width:0;width:100%;text-align:center}
+.days input::-webkit-inner-spin-button,.days input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.days input[type=number]{-moz-appearance:textfield;appearance:textfield}
+.hist .hdays .hd{padding:6px 0;min-width:0}
+.hist .hdays .rl{font-size:11px}
+.hist .hdays .dn{font-size:12.5px}
+.hist .hdays .dn small{display:block;font:500 12.5px var(--f-num);color:var(--muted)}
 .hist .hgrid{display:grid;grid-template-columns:52px repeat(4,1fr);gap:4px;align-items:center;margin-top:10px}
 .hist .hgrid span{font-size:12.5px;font-weight:800;color:var(--muted);text-align:center}
 .hist .hgrid span.hdn{text-align:left;font-weight:700}
@@ -1210,7 +1220,7 @@ function addEnds(){const s=state.mel,h=(s.hist||[])[0];if(!h||h.p)return;if(h.qE
 function legacyInit(i,vals){
   const s=state.mel,h=s.hist[i],[y,m,d]=h.pid.split("-").map(Number),os=new Date(y,m-1,d);
   const pr=JSON.parse(JSON.stringify(s)); ["hist","myPresets","holStash","qRoll","lRoll","anch"].forEach(k=>delete pr[k]);
-  Object.assign(pr,vals); pr.holD=Array(14).fill(false); pr.q160h="0"; pr.vacBal="0"; pr.sickBal="0";
+  Object.assign(pr,vals); if(!vals.holD)pr.holD=Array(14).fill(false); pr.q160h="0"; pr.vacBal="0"; pr.sickBal="0";
   // Sick earned this year at the start: the value that lands on today's number after this period's weeks.
   const endE=Math.max(0,(i===0&&CAL&&h.pid===ymd(addD(CAL.start,-14)))?starts(s).sickE:num(s.sickE,0)), sd=parseDateMDY(s.senDate);
   pr.sickE=String(endE);
@@ -1225,11 +1235,19 @@ function legacyInit(i,vals){
 }
 
 // Add a past pay period by hand (for periods that ended before History existed, or got cleared).
-function hoursGrid(os,P){const md=x=>x.toLocaleDateString("en-US",{month:"short",day:"numeric"}),v=(a,k)=>{const x=+((P||{})[a]||[])[k]||0;return x?x:"";};
-  let t=`<div class="hgrid"><span></span><span>Reg</span><span>OT</span><span>Vac</span><span>Sick</span>`;
-  for(const w of [0,7])ORDER.forEach((di,j)=>{const k=w+di,dd=addD(os,w+j);t+=`<span class="hdn">${DAYS[di]} ${dd.getDate()}</span>`+["hours","otD","pto","sickD"].map(a=>`<input type="number" inputmode="decimal" step="0.1" min="0" data-a="${a}" data-k="${k}" value="${v(a,k)}" placeholder="0" aria-label="${DAYS[di]} ${md(dd)} ${a}">`).join("");});
-  return t+`</div>`;}
-function gridVals(f){const vals={hours:Array(14).fill(0),otD:Array(14).fill(0),pto:Array(14).fill(0),sickD:Array(14).fill(0)};f.querySelectorAll(".hgrid input").forEach(inp=>{vals[inp.dataset.a][+inp.dataset.k]=Math.max(0,+inp.value||0);});return vals;}
+// Same layout as the Paycheck tab: days across (Fri → Thu), rows for Regular, OT, Vacation, Sick, Holiday.
+function hoursGrid(os,P){P=P||{};const g=(a,k)=>+((P[a]||[])[k])||0;let out="";
+  [0,7].forEach((o,w)=>{let t=`<p class="hwk">Week ${w+1}</p><div class="days hdays"><span class="rl"></span>`;
+    ORDER.forEach((i,j)=>{const dd=addD(os,o+j);t+=`<span class="dn${i>4?" we":""}">${DAYS[i]}<small>${dd.getDate()}</small></span>`;});
+    t+='<span class="rl">Regular</span>';ORDER.forEach(i=>{const k=o+i;t+=i>4?`<input type="number" data-a="hours" data-k="${k}" disabled placeholder="–" aria-label="${DAYS[i]} regular">`:`<input type="number" inputmode="decimal" step="0.1" min="0" max="8" data-a="hours" data-k="${k}" value="${g("hours",k)}" aria-label="${DAYS[i]} regular">`;});
+    [["otD","OT","ot"],["pto","Vacation","pto"],["sickD","Sick","pto"]].forEach(([a,lb,c])=>{t+=`<span class="rl">${lb}</span>`;ORDER.forEach(i=>{const k=o+i,v=g(a,k);t+=`<input type="number" inputmode="decimal" step="0.1" min="0" class="${c}" data-a="${a}" data-k="${k}" value="${v||""}" placeholder="0" aria-label="${DAYS[i]} ${lb}">`;});});
+    t+='<span class="rl">Holiday</span>';ORDER.forEach(i=>{const k=o+i;t+=`<button type="button" class="hd" data-hk="${k}" aria-pressed="${!!(P.holD||[])[k]}" aria-label="${DAYS[i]} holiday">H</button>`;});
+    out+=t+'</div>';});
+  return out;}
+function wireGrid(f){f.querySelectorAll("button[data-hk]").forEach(b=>b.addEventListener("click",()=>b.setAttribute("aria-pressed",String(b.getAttribute("aria-pressed")!=="true"))));}
+function gridVals(f){const vals={hours:Array(14).fill(0),otD:Array(14).fill(0),pto:Array(14).fill(0),sickD:Array(14).fill(0),holD:Array(14).fill(false)};
+  f.querySelectorAll("input[data-a]").forEach(inp=>{if(!inp.disabled)vals[inp.dataset.a][+inp.dataset.k]=Math.max(0,+inp.value||0);});
+  f.querySelectorAll("button[data-hk]").forEach(b=>{vals.holD[+b.dataset.hk]=b.getAttribute("aria-pressed")==="true";});return vals;}
 function renderHistAdd(){
   const box=$("histAddBox"),btn=$("histAdd"),s=state.mel; btn.hidden=!CAL; if(!CAL){box.hidden=true;return;}
   if(box.hidden)return;
@@ -1238,7 +1256,7 @@ function renderHistAdd(){
   if(!opts.length){box.innerHTML=`<p class="hint">The last 6 pay periods are already in History.</p>`;return;}
   const md=x=>x.toLocaleDateString("en-US",{month:"short",day:"numeric"});
   box.innerHTML=`<label class="mh" for="histAddSel">Which pay period?</label><select id="histAddSel">${opts.map(o=>`<option value="${ymd(o)}">${md(o)} – ${md(addD(o,13))}</option>`).join("")}</select><div class="hf"></div><div class="hbtns"><button type="button" class="mini" id="histAddSave">Save</button><button type="button" class="mini" id="histAddX">Cancel</button></div>`;
-  const draw=()=>{const [y,m,d]=$("histAddSel").value.split("-").map(Number);box.querySelector(".hf").innerHTML=hoursGrid(new Date(y,m-1,d),null);};
+  const draw=()=>{const [y,m,d]=$("histAddSel").value.split("-").map(Number);box.querySelector(".hf").innerHTML=hoursGrid(new Date(y,m-1,d),null);wireGrid(box);};
   draw(); $("histAddSel").onchange=draw;
   $("histAddX").onclick=()=>{box.hidden=true;renderHistAdd();};
   $("histAddSave").onclick=()=>{
@@ -1279,7 +1297,7 @@ function renderHist(){
     if(h.p&&h.vacEarned===undefined){const f=histFigures(h.p,os);h.vacEarned=f.vacEarned;h.sickEarned=f.sickEarned;}
     const row=(a,b,cl)=>`<p${cl?` class="${cl}"`:""}><span>${a}</span><span>${b}</span></p>`;
     const dt=document.createElement("details"); if(h._open)dt.open=true;
-    dt.innerHTML=`<summary><span>${md(os)} – ${md(addD(os,13))}<small>Paid ${md(new Date(py,pm-1,pd))}</small></span><b>${money(h.net)}</b></summary><div class="hd">`+`<p class="hh"><span>${h.reg} Reg · ${r1(h.ot+h.dt)} OT · ${h.vac} Vac · ${h.sick} Sick</span></p>`+
+    dt.innerHTML=`<summary><span>${md(os)} – ${md(addD(os,13))}<small>Paid ${md(new Date(py,pm-1,pd))}</small></span><b>${money(h.net)}</b></summary><div class="hdet">`+`<p class="hh"><span>${h.reg} Reg · ${r1(h.ot+h.dt)} OT · ${h.vac} Vac · ${h.sick} Sick</span></p>`+
       row("Straight time",money(h.stPay))+row(`OT 1.5× (${h.ot} hrs)`,money(h.otPay))+row(`Double time (${h.dt} hrs)`,money(h.dtPay))+
       row("Gross",money(h.gross),"t")+row("Federal income tax","−"+money(h.fed))+row("Social Security + Medicare","−"+money(h.fica))+row("Everything else","−"+money(h.other))+
       row("Take-home",money(h.net),"t")+
@@ -1291,12 +1309,12 @@ function renderHist(){
     const ed=dt.querySelector(".hedit");
     if(ed)ed.addEventListener("click",()=>{const f=dt.querySelector(".hform");if(!f.hidden){f.hidden=true;return;}
       const P=h.p||{hours:[],otD:[],pto:[],sickD:[]},v=(a,k)=>{const x=+(P[a]||[])[k]||0;return x?x:"";};
-      let t=(h.p?"":`<p class="hint">This one was saved before daily hours were kept. Enter its hours once and you can edit it like the others.</p>`)+`<div class="hgrid"><span></span><span>Reg</span><span>OT</span><span>Vac</span><span>Sick</span>`;
-      for(const w of [0,7])ORDER.forEach((di,j)=>{const k=w+di,dd=addD(os,w+j);t+=`<span class="hdn">${DAYS[di]} ${dd.getDate()}</span>`+["hours","otD","pto","sickD"].map(a=>`<input type="number" inputmode="decimal" step="0.1" min="0" data-a="${a}" data-k="${k}" value="${v(a,k)}" placeholder="0" aria-label="${DAYS[di]} ${md(dd)} ${a}">`).join("");});
-      f.innerHTML=t+`</div><div class="hbtns"><button type="button" class="mini hsave">Save changes</button><button type="button" class="mini hcancel">Cancel</button></div>`;f.hidden=false;
+      const t=(h.p?"":`<p class="hint">This one was saved before daily hours were kept. Enter its hours once and you can edit it like the others.</p>`)+hoursGrid(os,P);
+
+      f.innerHTML=t+`<div class="hbtns"><button type="button" class="mini hsave">Save changes</button><button type="button" class="mini hcancel">Cancel</button></div>`;f.hidden=false;wireGrid(f);
       f.querySelector(".hcancel").onclick=()=>{f.hidden=true;};
-      f.querySelector(".hsave").onclick=()=>{const z=()=>Array(14).fill(0),vals={hours:(P.hours||[]).slice(),otD:(P.otD||[]).slice(),pto:(P.pto||[]).slice(),sickD:(P.sickD||[]).slice()};["hours","otD","pto","sickD"].forEach(a=>{for(let k=0;k<14;k++)vals[a][k]=+vals[a][k]||0;});
-        f.querySelectorAll("input").forEach(inp=>{vals[inp.dataset.a][+inp.dataset.k]=Math.max(0,+inp.value||0);});
+      f.querySelector(".hsave").onclick=()=>{const vals=gridVals(f);
+
         if(!h.p){legacyInit(i,vals);const nh=state.mel.hist[i];nh._open=true;nh._msg=`Saved. Take-home for this period: ${money(nh.net)}. It keeps its daily hours now, so later edits carry forward.`;renderHist();return;}
         const old=h.net,r=saveHistEdit(i,vals),nh=state.mel.hist[i],bits=[];
         bits.push(`Take-home ${money(old)} → ${money(nh.net)}`); if(r.dQ)bits.push(`quarter OT ${r.dQ>0?"+":""}${r.dQ}`); if(r.dV)bits.push(`vacation ${r.dV>0?"+":""}${r.dV}`); if(r.dS)bits.push(`sick ${r.dS>0?"+":""}${r.dS}`);
@@ -1403,11 +1421,9 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=24;
+const NOTES_VERSION=25;
 const NOTES=[
-  "History: missed a pay period? Tap Add a past pay period at the bottom, enter its hours once, and it's saved without changing today's numbers",
-  "History also lets you edit any past period's hours, and shows the PTO you earned each period",
-  "The app now updates itself when a new version comes out"
+  "History: Edit hours and Add a past pay period now use the same week grid as the Paycheck tab, including holidays"
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

@@ -79,6 +79,13 @@ input:focus-visible,select:focus-visible,button:focus-visible,[role=button]:focu
 .hist .hd .hh{border-top:0;color:var(--muted);font-size:13.5px}
 .hist .hd p.t{font-weight:900}
 .hist .hdel{margin-top:8px;background:none;border:0;color:var(--warn);font:700 13px var(--f-body);text-decoration:underline;cursor:pointer;padding:4px 0}
+.hist .hbtns{display:flex;gap:10px;align-items:center;margin-top:8px}
+.hist .hform[hidden]{display:none}
+.hist .hgrid{display:grid;grid-template-columns:52px repeat(4,1fr);gap:4px;align-items:center;margin-top:10px}
+.hist .hgrid span{font-size:12.5px;font-weight:800;color:var(--muted);text-align:center}
+.hist .hgrid span.hdn{text-align:left;font-weight:700}
+.hist .hgrid input{width:100%;min-width:0;padding:6px 2px;text-align:center;font-size:15px}
+.hist .hmsg{display:block!important;border-top:0!important;color:var(--accent);font-weight:700;font-size:13.5px}
 .sicktog{background:none;border:0;color:var(--accent);font:700 13px var(--f-body);text-decoration:underline;cursor:pointer;padding:2px 0 8px;display:block}
 .sicktog[hidden]{display:none}
 .days{display:grid;grid-template-columns:58px repeat(7,minmax(0,1fr));gap:5px 5px;margin-bottom:6px;align-items:center}
@@ -731,8 +738,10 @@ function renderCal(s){
   $("newper").hidden=!(on&&s.periodId!==CAL.id);
   if(!on){$("subLine").textContent="Biweekly pay";return;}
   const ord=["1st","2nd","3rd"][CAL.rank-1]||CAL.rank+"th";
-  const dLeft=dayN(CAL.pay)-dayN(new Date());
-  $("subLine").textContent=dLeft<=0?`Payday today · ${fmtD(CAL.pay)}`:dLeft===1?`Payday tomorrow · ${fmtD(CAL.pay)}`:`Payday in ${dLeft} days · ${fmtD(CAL.pay)}`;
+  // Next payday you'll actually get: last period's check if it hasn't been paid yet, otherwise this period's.
+  const nNow=Math.round((dayN(CAL.start)-dayN(ANCHOR))/14), prevPay=payFor(nNow-1).d, nextPay=dayN(prevPay)>=dayN(new Date())?prevPay:CAL.pay;
+  const dLeft=dayN(nextPay)-dayN(new Date());
+  $("subLine").textContent=dLeft<=0?`Payday today · ${fmtD(nextPay)}`:dLeft===1?`Payday tomorrow · ${fmtD(nextPay)}`:`Payday in ${dLeft} days · ${fmtD(nextPay)}`;
   $("period").innerHTML=`Pay period <b>${fmtD(CAL.start)} – ${fmtD(CAL.end)}</b> · paid <b>${fmtD(CAL.pay)}</b>${CAL.est?" (estimated)":""}`+
     `<small>${ord} check in ${CAL.month}${CAL.qEndD?` · <span class="q">Budget quarter ends ${fmtD(CAL.qEndD)}: overtime after that starts the new quarter at 0</span>`:""}${CAL.pastCard?" · Past the union card: holidays aren't marked automatically":""}</small>`;
   $("duesAuto").textContent=(CAL.rank===1?`${fmtD(CAL.pay)} is the 1st check in ${CAL.month}: union dues come out, MNPL doesn't.`:CAL.rank===2?`${fmtD(CAL.pay)} is the 2nd check in ${CAL.month}: MNPL comes out, union dues don't.`:`${fmtD(CAL.pay)} is the ${ord} check in ${CAL.month}: no union dues, MNPL or medical.`)+" ⚠ Based on a few stubs, not yet confirmed.";
@@ -1166,29 +1175,96 @@ $("sickTog").onclick=()=>{const s=state[who];s.showSick=!s.showSick;renderSick()
 // History: each finished Current pay period is saved when the new one starts (Start new period / Keep hours).
 function snapPeriod(){
   const s=state.mel; if(!CAL||!s.periodId||s.periodId===CAL.id)return;
-  const [y,m,d]=s.periodId.split("-").map(Number), oc=calFor(new Date(y,m-1,d)), c=calc(s,oc);
-  const t=a=>r1((a||[]).reduce((x,v)=>x+(+v||0),0)), f2=v=>Math.round(v*100)/100;
-  const e={pid:s.periodId,pay:ymd(oc.pay),reg:r1(c.st),ot:r1(c.ot),dt:r1(c.dt),vac:t(s.pto),sick:t(s.sickD),hol:r1(c.holH),
-    stPay:f2(c.stPay),otPay:f2(c.otPay),dtPay:f2(c.dtPay),holPay:f2(c.holPay||0),gross:f2(c.gross),fed:f2(c.fed),fica:f2(c.fica),
-    other:f2(c.gross-c.fed-c.fica-c.net),net:f2(c.net),rate:c.r};
+  const [y,m,d]=s.periodId.split("-").map(Number), st=starts(s);
+  // Keep the period's own hours and settings so it can be edited and recalculated later.
+  const pr=JSON.parse(JSON.stringify(s)); ["hist","myPresets","holStash","qRoll","lRoll","anch"].forEach(k=>delete pr[k]);
+  pr.q160h=String(st.q); pr.sickE=String(st.sickE); pr.vacBal=st.vac===null?"":String(st.vac); pr.sickBal=st.sick===null?"":String(st.sick);
+  const e=histFigures(pr,new Date(y,m-1,d)); e.pid=s.periodId; e.p=pr; e.st=st;
   const H=(s.hist||(s.hist=[])).filter(x=>x.pid!==e.pid); H.unshift(e); s.hist=H.slice(0,26);
 }
-function addEnds(){const s=state.mel,h=(s.hist||[])[0];if(!h||h.qEnd!==undefined)return;h.qEnd=num(s.q160h,0);if(s.vacBal!==""&&s.vacBal!=null)h.vacEnd=num(s.vacBal,0);if(s.sickBal!==""&&s.sickBal!=null)h.sickEnd=num(s.sickBal,0);}
+// Pay and leave for one saved period, from its own hours and starting numbers.
+function histFigures(pr,os){
+  const oc=calFor(os), c=calc(pr,oc), t=a=>r1((a||[]).reduce((x,v)=>x+(+v||0),0)), f2=v=>Math.round(v*100)/100;
+  const e={pay:ymd(oc.pay),reg:r1(c.st),ot:r1(c.ot),dt:r1(c.dt),vac:t(pr.pto),sick:t(pr.sickD),hol:r1(c.holH),
+    stPay:f2(c.stPay),otPay:f2(c.otPay),dtPay:f2(c.dtPay),holPay:f2(c.holPay||0),gross:f2(c.gross),fed:f2(c.fed),fica:f2(c.fica),
+    other:f2(c.gross-c.fed-c.fica-c.net),net:f2(c.net),rate:c.r,qEnd:r1(c.qEnd)};
+  const sd=parseDateMDY(pr.senDate); let sickE=Math.max(0,num(pr.sickE,0)),toS=0,toV=0;
+  if(sd){const div=vacDivisor(yrsBetween(sd,addD(os,13)));let aOff=null;
+    for(const Y of [os.getFullYear(),os.getFullYear()+1]){const o=dayN(new Date(Y,sd.getMonth(),sd.getDate()))-dayN(os);if(o>=0&&o<=13&&aOff===null)aOff=o;}
+    let reset=false;for(const w of [0,1]){if(aOff!==null&&!reset&&aOff<=7*w){sickE=0;reset=true;}
+      let wh=0;for(let k=w*7;k<w*7+7;k++)wh+=(+pr.hours[k]||0)+(+(pr.otD||[])[k]||0);if(pr.shift3)wh=wh*8/6.5;
+      const cr=r1(wh/div);if(sickE<40){sickE=r1(sickE+cr);toS=r1(toS+cr);}else toV=r1(toV+cr);}
+    if(aOff!==null&&!reset)sickE=0;}
+  e.sickEEnd=sickE; e.vacEarned=sd?toV:null; e.sickEarned=sd?toS:null;
+  if(pr.vacBal!=="")e.vacEnd=r1(num(pr.vacBal,0)+toV-t(pr.pto)*vacX(pr));
+  if(pr.sickBal!=="")e.sickEnd=r1(num(pr.sickBal,0)+toS-t(pr.sickD));
+  return e;
+}
+function addEnds(){const s=state.mel,h=(s.hist||[])[0];if(!h||h.p)return;if(h.qEnd===undefined)h.qEnd=num(s.q160h,0);if(s.vacBal!==""&&s.vacBal!=null)h.vacEnd=num(s.vacBal,0);if(s.sickBal!==""&&s.sickBal!=null)h.sickEnd=num(s.sickBal,0);}
+
+// An entry saved before daily hours were kept: take the hours now, and work out its starting numbers
+// from the end numbers it already has, so nothing else moves.
+function legacyInit(i,vals){
+  const s=state.mel,h=s.hist[i],[y,m,d]=h.pid.split("-").map(Number),os=new Date(y,m-1,d);
+  const pr=JSON.parse(JSON.stringify(s)); ["hist","myPresets","holStash","qRoll","lRoll","anch"].forEach(k=>delete pr[k]);
+  Object.assign(pr,vals); pr.holD=Array(14).fill(false); pr.q160h="0"; pr.vacBal="0"; pr.sickBal="0";
+  pr.sickE=String(num(s.sickE,0)>=40?40:Math.max(0,num(s.sickE,0)));
+  const z=histFigures(pr,os);
+  pr.q160h=String(Math.max(0,r1((h.qEnd||0)-z.qEnd)));
+  pr.vacBal=h.vacEnd!=null?String(r1(h.vacEnd-z.vacEnd)):""; pr.sickBal=h.sickEnd!=null?String(r1(h.sickEnd-z.sickEnd)):"";
+  const n=histFigures(pr,os); s.hist[i]=Object.assign({pid:h.pid,p:pr,st:{q:num(pr.q160h,0),sickE:num(pr.sickE,0),vac:pr.vacBal===""?null:num(pr.vacBal,0),sick:pr.sickBal===""?null:num(pr.sickBal,0)}},n);
+  if(h.qEnd!=null)s.hist[i].qEnd=h.qEnd; if(h.vacEnd!=null)s.hist[i].vacEnd=h.vacEnd; if(h.sickEnd!=null)s.hist[i].sickEnd=h.sickEnd;
+  save();
+}
+// Save edited hours for a past period, then carry the change forward to later periods and today's numbers.
+function saveHistEdit(i,vals){
+  const s=state.mel,H=s.hist,h=H[i],[y,m,d]=h.pid.split("-").map(Number),os=new Date(y,m-1,d);
+  Object.assign(h.p,vals); const n=histFigures(h.p,os);
+  const dQ=r1(n.qEnd-(h.qEnd||0)), dV=(n.vacEnd!=null&&h.vacEnd!=null)?r1(n.vacEnd-h.vacEnd):0, dS=(n.sickEnd!=null&&h.sickEnd!=null)?r1(n.sickEnd-h.sickEnd):0, dE=r1(n.sickEEnd-(h.sickEEnd??n.sickEEnd));
+  const keep={pid:h.pid,p:h.p,st:h.st}; H[i]=Object.assign(keep,n);
+  const endN=dayN(addD(os,13)), qBreak=toN=>QENDS.some(q=>{const [a,b,c]=q.split("-").map(Number),x=dayN(new Date(a,b-1,c));return x>=endN&&x<toN;});
+  for(let j=i-1;j>=0;j--){const L=H[j],[ly,lm,ld]=L.pid.split("-").map(Number),lN=dayN(new Date(ly,lm-1,ld));const qOk=!qBreak(lN);
+    if(L.p){if(qOk)L.p.q160h=String(r1(num(L.p.q160h,0)+dQ));if(L.p.vacBal!=="")L.p.vacBal=String(r1(num(L.p.vacBal,0)+dV));if(L.p.sickBal!=="")L.p.sickBal=String(r1(num(L.p.sickBal,0)+dS));L.p.sickE=String(r1(num(L.p.sickE,0)+dE));
+      H[j]=Object.assign({pid:L.pid,p:L.p,st:L.st},histFigures(L.p,new Date(ly,lm-1,ld)));}
+    else{if(qOk&&L.qEnd!=null)L.qEnd=r1(L.qEnd+dQ);if(L.vacEnd!=null)L.vacEnd=r1(L.vacEnd+dV);if(L.sickEnd!=null)L.sickEnd=r1(L.sickEnd+dS);}}
+  if(CAL&&!qBreak(dayN(CAL.start))&&dQ)s.q160h=String(r1(num(s.q160h,0)+dQ));
+  if(dV&&s.vacBal!==""&&s.vacBal!=null)s.vacBal=String(r1(num(s.vacBal,0)+dV));
+  if(dS&&s.sickBal!==""&&s.sickBal!=null)s.sickBal=String(r1(num(s.sickBal,0)+dS));
+  if(dE)s.sickE=String(r1(num(s.sickE,0)+dE));
+  write(); save(); render(); return {dQ,dV,dS};
+}
 function renderHist(){
   const L=state.mel.hist||[], el=$("histList"); el.textContent="";
   if(!L.length){el.innerHTML=`<p class="hint">Nothing yet. When a new pay period starts and you tap Start new period or Keep hours on Current, the one that just ended is saved here.</p>`;return;}
   const box=document.createElement("div"); box.className="hist";
+  const md=x=>x.toLocaleDateString("en-US",{month:"short",day:"numeric"});
   L.forEach((h,i)=>{const [y,m,d]=h.pid.split("-").map(Number),os=new Date(y,m-1,d),[py,pm,pd]=h.pay.split("-").map(Number);
+    if(h.p&&h.vacEarned===undefined){const f=histFigures(h.p,os);h.vacEarned=f.vacEarned;h.sickEarned=f.sickEarned;}
     const row=(a,b,cl)=>`<p${cl?` class="${cl}"`:""}><span>${a}</span><span>${b}</span></p>`;
-    const dt=document.createElement("details");
-    const md=x=>x.toLocaleDateString("en-US",{month:"short",day:"numeric"});
+    const dt=document.createElement("details"); if(h._open)dt.open=true;
     dt.innerHTML=`<summary><span>${md(os)} – ${md(addD(os,13))}<small>Paid ${md(new Date(py,pm-1,pd))}</small></span><b>${money(h.net)}</b></summary><div class="hd">`+`<p class="hh"><span>${h.reg} Reg · ${r1(h.ot+h.dt)} OT · ${h.vac} Vac · ${h.sick} Sick</span></p>`+
       row("Straight time",money(h.stPay))+row(`OT 1.5× (${h.ot} hrs)`,money(h.otPay))+row(`Double time (${h.dt} hrs)`,money(h.dtPay))+
       row("Gross",money(h.gross),"t")+row("Federal income tax","−"+money(h.fed))+row("Social Security + Medicare","−"+money(h.fica))+row("Everything else","−"+money(h.other))+
       row("Take-home",money(h.net),"t")+
-      (h.qEnd!==undefined?row("Quarter OT at end",h.qEnd+" hrs"):"")+(h.vacEnd!==undefined?row("Vacation at end",h.vacEnd+" hrs"):"")+(h.sickEnd!==undefined?row("Sick at end",h.sickEnd+" hrs"):"")+
-      `<button type="button" class="hdel">Delete</button></div>`;
+      (h.vacEarned!=null?row("Vacation earned","+"+h.vacEarned+" hrs")+row("Sick leave earned","+"+h.sickEarned+" hrs"):(()=>{const sd=parseDateMDY((h.p||state.mel).senDate);if(!sd)return row("PTO earned","add seniority date");const T=r1((h.reg+h.ot+h.dt)/vacDivisor(yrsBetween(sd,addD(os,13))));return row("PTO earned (vacation + sick)","+"+T+" hrs");})())+(h.qEnd!==undefined?row("Quarter OT at end",h.qEnd+" hrs"):"")+(h.vacEnd!==undefined?row("Vacation at end",h.vacEnd+" hrs"):"")+(h.sickEnd!==undefined?row("Sick at end",h.sickEnd+" hrs"):"")+
+      (h._msg?`<p class="hmsg">${h._msg}</p>`:"")+
+      `<div class="hbtns"><button type="button" class="mini hedit">Edit hours</button><button type="button" class="hdel">Delete</button></div><div class="hform" hidden></div></div>`;
+    delete h._open; delete h._msg;
     const del=dt.querySelector(".hdel"); del.addEventListener("click",()=>confirmTap(del,()=>{state.mel.hist.splice(i,1);save();renderHist();}));
+    const ed=dt.querySelector(".hedit");
+    if(ed)ed.addEventListener("click",()=>{const f=dt.querySelector(".hform");if(!f.hidden){f.hidden=true;return;}
+      const P=h.p||{hours:[],otD:[],pto:[],sickD:[]},v=(a,k)=>{const x=+(P[a]||[])[k]||0;return x?x:"";};
+      let t=(h.p?"":`<p class="hint">This one was saved before daily hours were kept. Enter its hours once and you can edit it like the others.</p>`)+`<div class="hgrid"><span></span><span>Reg</span><span>OT</span><span>Vac</span><span>Sick</span>`;
+      for(const w of [0,7])ORDER.forEach((di,j)=>{const k=w+di,dd=addD(os,w+j);t+=`<span class="hdn">${DAYS[di]} ${dd.getDate()}</span>`+["hours","otD","pto","sickD"].map(a=>`<input type="number" inputmode="decimal" step="0.1" min="0" data-a="${a}" data-k="${k}" value="${v(a,k)}" placeholder="0" aria-label="${DAYS[di]} ${md(dd)} ${a}">`).join("");});
+      f.innerHTML=t+`</div><div class="hbtns"><button type="button" class="mini hsave">Save changes</button><button type="button" class="mini hcancel">Cancel</button></div>`;f.hidden=false;
+      f.querySelector(".hcancel").onclick=()=>{f.hidden=true;};
+      f.querySelector(".hsave").onclick=()=>{const z=()=>Array(14).fill(0),vals={hours:(P.hours||[]).slice(),otD:(P.otD||[]).slice(),pto:(P.pto||[]).slice(),sickD:(P.sickD||[]).slice()};["hours","otD","pto","sickD"].forEach(a=>{for(let k=0;k<14;k++)vals[a][k]=+vals[a][k]||0;});
+        f.querySelectorAll("input").forEach(inp=>{vals[inp.dataset.a][+inp.dataset.k]=Math.max(0,+inp.value||0);});
+        if(!h.p){legacyInit(i,vals);const nh=state.mel.hist[i];nh._open=true;nh._msg=`Saved. Take-home for this period: ${money(nh.net)}. It keeps its daily hours now, so later edits carry forward.`;renderHist();return;}
+        const old=h.net,r=saveHistEdit(i,vals),nh=state.mel.hist[i],bits=[];
+        bits.push(`Take-home ${money(old)} → ${money(nh.net)}`); if(r.dQ)bits.push(`quarter OT ${r.dQ>0?"+":""}${r.dQ}`); if(r.dV)bits.push(`vacation ${r.dV>0?"+":""}${r.dV}`); if(r.dS)bits.push(`sick ${r.dS>0?"+":""}${r.dS}`);
+        nh._open=true; nh._msg=`Saved. ${bits.join(" · ")}${(r.dQ||r.dV||r.dS)?". Later periods and today's numbers were updated too.":"."}`; renderHist();};
+    });
     box.appendChild(dt);});
   el.appendChild(box);
   el.insertAdjacentHTML("beforeend",`<p class="hint">Estimates from the hours you entered. Saved on this phone; up to a year.</p>`);
@@ -1290,9 +1366,11 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=21;
+const NOTES_VERSION=22;
 const NOTES=[
-  "New History tab: each finished pay period on Current is saved when you tap Start new period or Keep hours, so you can look back at past checks"
+  "History: tap Edit hours on any past pay period to fix its hours. Pay, quarter OT and PTO recalculate and carry forward to today",
+  "History also shows the PTO you earned each pay period",
+  "The payday at the top now counts down to your next check, not the one after"
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

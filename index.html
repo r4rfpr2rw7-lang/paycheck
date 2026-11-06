@@ -844,9 +844,9 @@ function renderVac(s,c){
   const addV=inc?perV[1]:toVac, addS=inc?perS[1]:toSick, sub=viz?"hrs":inc?"week 2":"this pay period";
   el.innerHTML=`<p class="vsrc">${src}</p><div class="hbig"><div class="otw"><span>New vacation</span><b>${addV}</b><small>${sub}</small></div><div class="pto"><span>New sick leave</span><b>${addS}</b><small>${sick>=40?"full for the year":`${r1(sick)} of 40 this year`}</small></div>`+
     `<div><span>Vacation at end of pay period</span><b>${bal===null?"–":bal}</b><small>${bal===null?"add your balance above":endLine(viz?st0.vac:rawV,perV,s.pto,vx)}</small></div><div><span>Sick at end of pay period</span><b>${sbal===null?"–":sbal}</b><small>${sbal===null?"add your balance above":endLine(viz?st0.sick:rawS,perS,s.sickD,1)}</small></div></div>`+
-    `<p class="daydet">1 hr per ${div} worked (${yrs} yrs)<br>${lines.map((l,w)=>inc&&w===0?l+" (on your page)":l).join("<br>")}</p>`+rollNote+
+    rollNote+
     `<div class="hsum"><span>${viz?"A full year at this pace":`By ${fmtD(ann)}, ${ann.getFullYear()} at this pace`}</span><span>+${pv} hrs vacation</span></div>`+
-    `<p class="hint" style="margin-top:8px">Only hours worked earn PTO. Sick fills to 40 a year first, then vacation. Sick restarts ${viz?"on your anniversary":fmtD(ann)}.${viz?(nextT?` 1 per ${vacDivisor(nextT)} at ${nextT} yrs.`:""):(yrs<5?" 1 per 16 at 5 yrs.":"")}</p>`;
+    `<p class="hint" style="margin-top:8px">You earn 1 hr per ${div} hrs worked (${yrs} yrs seniority). Only hours worked count. Sick fills to 40 a year first, then vacation. Sick restarts ${viz?"on your anniversary":fmtD(ann)}.${viz?(nextT?` 1 per ${vacDivisor(nextT)} at ${nextT} yrs.`:""):(yrs<5?" 1 per 16 at 5 yrs.":"")}</p>`;
 }
 function stampHolidays(){if(!CAL)return;DEF.forEach((_,k)=>{if(HOLIDAYS.has(CAL.dates[k]))$("hd"+k).setAttribute("aria-pressed","true");});}
 // Day rules: no regular hours on Sat, Sun or holidays; regular is capped at 8 minus PTO.
@@ -1242,7 +1242,7 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=20;
+const NOTES_VERSION=20; // matches the live site (GitHub); bump before the next push
 const NOTES=[
   "PTO tab is simpler: it shows only the new vacation and sick hours not on your timekeeping page yet, and your balances at the end of the pay period"
 ];

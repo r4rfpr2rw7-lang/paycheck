@@ -97,6 +97,12 @@ input:focus-visible,select:focus-visible,button:focus-visible,[role=button]:focu
 .hist .hgrid span.hdn{text-align:left;font-weight:700}
 .hist .hgrid input{width:100%;min-width:0;padding:6px 2px;text-align:center;font-size:15px}
 .hist .hmsg{display:block!important;border-top:0!important;color:var(--accent);font-weight:700;font-size:13.5px}
+input.ro{opacity:.7;border-style:dashed}
+.perseg{display:flex;gap:6px;margin:0 0 14px;padding:4px;border:2.5px solid var(--edge);border-radius:999px;background:var(--panel)}
+.perseg[hidden]{display:none}
+.perseg button{flex:1;border:0;border-radius:999px;padding:8px 6px;font:800 13.5px var(--f-body);background:none;color:var(--muted);cursor:pointer;line-height:1.2}
+.perseg button small{display:block;font:600 12px var(--f-body);opacity:.85}
+.perseg button[aria-selected="true"]{background:var(--plate);color:var(--on-plate);box-shadow:inset 0 0 0 2px var(--edge)}
 .sicktog{background:none;border:0;color:var(--accent);font:700 13px var(--f-body);text-decoration:underline;cursor:pointer;padding:2px 0 8px;display:block}
 .sicktog[hidden]{display:none}
 .days{display:grid;grid-template-columns:58px repeat(7,minmax(0,1fr));gap:5px 5px;margin-bottom:6px;align-items:center}
@@ -354,6 +360,7 @@ td{font-weight:600}
 
   <div class="grid" id="payTab">
     <section class="panel">
+      <div class="perseg" id="perSeg" role="tablist" hidden><button type="button" id="segCur" role="tab"></button><button type="button" id="segPrev" role="tab"></button></div>
       <div class="copycur" id="copyCurRow" hidden><span>Start from your real numbers:</span><span class="copybtns"><button id="copyCur" class="mini" type="button">Copy Current setup</button><button id="copyCurH" class="mini" type="button">Copy Current hours</button></span></div>
       <details id="setup" class="setup">
       <summary id="setupSum">Your setup</summary>
@@ -603,6 +610,9 @@ const money=v=>(v<0?"−":"")+"$"+Math.abs(v).toLocaleString("en-US",{minimumFra
 
 // Day grid: index k = (week-1)*7 + Mon-based day; shown Fri → Thu
 const ORDER=[4,5,6,0,1,2,3];
+// "prev" = the last pay period, still waiting to be paid. It's a view of its History entry, shown like Current.
+let PCAL=null, PPID=null;
+const vcal=()=>who==="mel"?CAL:who==="prev"?PCAL:null;
 let selDay=null;
 [1,2].forEach(wk=>{
   const el=$("days"+wk), o=(wk-1)*7;
@@ -639,7 +649,7 @@ function dayPay(i,h,p,hol){
 
 // Pure calculation: per-day union rules, two separate weeks
 function calc(p,calOv){
-  const cal=calOv!==undefined?calOv:(p===state.mel)?CAL:null; // pay calendar applies to the Current profile only
+  const cal=calOv!==undefined?calOv:(p===state.mel)?CAL:(who==="prev"&&p===state.prev)?PCAL:null; // pay calendar: Current and the pending check
   let st=0,pto=0,ot=0,dt=0,holH=0,holW=0,worked=0;
   const P=Array.from({length:14},(_,k)=>ptoAt(p,k)), H=p.holD||[];
   // 160-hr rule, day by day in pay-period order (Fri → Thu, week 1 then week 2).
@@ -707,7 +717,7 @@ function write(){
   $("credit").value=s.credit||""; $("oPre").value=s.oPre||""; $("oPost").value=s.oPost||"";
   $("setup").open=!(+s.rate>0);
   buildDayOpts();
-  if(s.hDay==null){let t=0;if(who==="mel"&&CAL){const f=DEF.findIndex((_,k)=>CAL.dates[k]===CAL.todayYmd);if(f>=0)t=f;}else t=4;s.hDay=t;}
+  if(s.hDay==null){let t=0;if(vcal()){const C=vcal(),f=DEF.findIndex((_,k)=>C.dates[k]===C.todayYmd);if(f>=0)t=f;}else t=4;s.hDay=t;}
   {const pt=String(s.senDate||"").split(/[\/\-.]/);$("senM").value=pt[0]||"";$("senD").value=pt[1]||"";$("senY").value=pt[2]||"";} $("senYrs").value=s.senYrs??""; $("sickE").value=s.sickE??""; $("vacBal").value=s.vacBal??""; $("sickBal").value=s.sickBal??""; $("shift3").checked=!!s.shift3;
   $("hDay").value=s.hDay; $("hsS").value=s.hsS||"6:00"; $("hsE").value=s.hsE||"2:30"; $("hsL").value=s.hsL??30;
   $("hIn").value=s.hIn||""; $("hOut").value=s.hOut||""; $("hLunch").checked=!!s.hClaim; $("hHol").checked=!!s.hHol;
@@ -737,34 +747,34 @@ function dayText(k,s){
 }
 function row(label,sub,val){return `<tr><td>${label}${sub?`<small>${sub}</small>`:""}</td><td class="n">${val}</td></tr>`;}
 function renderCal(s){
-  const on=who==="mel"&&CAL;
+  const C=vcal(), on=!!C;
   DEF.forEach((_,k)=>{
-    const b=$("dn"+k), i=k%7, isToday=on&&CAL.dates[k]===CAL.todayYmd;
-    if(on){const dd=+CAL.dates[k].slice(8);b.innerHTML=`${DAYS[i]}<small>${dd}</small>`;}else b.textContent=DAYS[i];
+    const b=$("dn"+k), i=k%7, isToday=on&&C.dates[k]===C.todayYmd;
+    if(on){const dd=+C.dates[k].slice(8);b.innerHTML=`${DAYS[i]}<small>${dd}</small>`;}else b.textContent=DAYS[i];
     b.classList.toggle("today",!!isToday); $("h"+k).classList.toggle("today",!!isToday); $("o"+k).classList.toggle("today",!!isToday);
-    const lock=!!(on&&HOLIDAYS.has(CAL.dates[k])), hb=$("hd"+k);
+    const lock=!!(on&&HOLIDAYS.has(C.dates[k])), hb=$("hd"+k);
     hb.disabled=lock; hb.classList.toggle("locked",lock); hb.title=lock?"Union holiday":"";
     if(i>=5){hb.disabled=true;hb.classList.remove("locked");hb.setAttribute("aria-pressed","false");hb.title="Weekend: normal weekend rates, no holiday pay";}
     if(lock)hb.setAttribute("aria-pressed","true");
   });
   $("period").hidden=!on; $("duesRow").hidden=!!on; $("duesAuto").hidden=!on;
-  $("newper").hidden=!(on&&s.periodId!==CAL.id);
+  $("newper").hidden=!(who==="mel"&&CAL&&s.periodId!==CAL.id);
   if(!on){$("subLine").textContent="Biweekly pay";return;}
-  const ord=["1st","2nd","3rd"][CAL.rank-1]||CAL.rank+"th";
+  const ord=["1st","2nd","3rd"][C.rank-1]||C.rank+"th";
   // Next payday you'll actually get: last period's check if it hasn't been paid yet, otherwise this period's.
   const nNow=Math.round((dayN(CAL.start)-dayN(ANCHOR))/14), prevPay=payFor(nNow-1).d, nextPay=dayN(prevPay)>=dayN(new Date())?prevPay:CAL.pay;
   const dLeft=dayN(nextPay)-dayN(new Date());
   $("subLine").textContent=dLeft<=0?`Payday today · ${fmtD(nextPay)}`:dLeft===1?`Payday tomorrow · ${fmtD(nextPay)}`:`Payday in ${dLeft} days · ${fmtD(nextPay)}`;
-  $("period").innerHTML=`Pay period <b>${fmtD(CAL.start)} – ${fmtD(CAL.end)}</b> · paid <b>${fmtD(CAL.pay)}</b>${CAL.est?" (estimated)":""}`+
-    `<small>${ord} check in ${CAL.month}${CAL.qEndD?` · <span class="q">Budget quarter ends ${fmtD(CAL.qEndD)}: overtime after that starts the new quarter at 0</span>`:""}${CAL.pastCard?" · Past the union card: holidays aren't marked automatically":""}</small>`;
-  $("duesAuto").textContent=(CAL.rank===1?`${fmtD(CAL.pay)} is the 1st check in ${CAL.month}: union dues come out, MNPL doesn't.`:CAL.rank===2?`${fmtD(CAL.pay)} is the 2nd check in ${CAL.month}: MNPL comes out, union dues don't.`:`${fmtD(CAL.pay)} is the ${ord} check in ${CAL.month}: no union dues, MNPL or medical.`)+" ⚠ Based on a few stubs, not yet confirmed.";
-  if(s.periodId!==CAL.id){
+  $("period").innerHTML=`Pay period <b>${fmtD(C.start)} – ${fmtD(C.end)}</b> · paid <b>${fmtD(C.pay)}</b>${C.est?" (estimated)":""}`+
+    `<small>${ord} check in ${C.month}${C.qEndD?` · <span class="q">Budget quarter ends ${fmtD(C.qEndD)}: overtime after that starts the new quarter at 0</span>`:""}${C.pastCard?" · Past the union card: holidays aren't marked automatically":""}</small>`;
+  $("duesAuto").textContent=(C.rank===1?`${fmtD(C.pay)} is the 1st check in ${C.month}: union dues come out, MNPL doesn't.`:C.rank===2?`${fmtD(C.pay)} is the 2nd check in ${C.month}: MNPL comes out, union dues don't.`:`${fmtD(C.pay)} is the ${ord} check in ${C.month}: no union dues, MNPL or medical.`)+" ⚠ Based on a few stubs, not yet confirmed.";
+  if(who==="mel"&&s.periodId!==CAL.id){
     const [y,m,d]=s.periodId.split("-").map(Number), os=new Date(y,m-1,d);
     $("npText").textContent=`New pay period, clean slate. It started (${fmtD(CAL.start)} – ${fmtD(CAL.end)}). The hours below are from ${fmtD(os)} – ${fmtD(addD(os,13))}.`;
   }
 }
 // ---- Hours calculator tab ----
-function dayLabel(k){const i=k%7;if(who==="mel"&&CAL){const [y,m,d]=CAL.dates[k].split("-").map(Number);return fmtD(new Date(y,m-1,d));}return `Week ${k<7?1:2} ${DAYS[i]}`;}
+function dayLabel(k){const i=k%7;if(vcal()){const [y,m,d]=vcal().dates[k].split("-").map(Number);return fmtD(new Date(y,m-1,d));}return `Week ${k<7?1:2} ${DAYS[i]}`;}
 function buildDayOpts(){
   const sel=$("hDay"), keep=sel.value; let html="";
   for(const w of [0,7]) for(const i of ORDER){const k=w+i;html+=`<option value="${k}">${dayLabel(k)}</option>`;}
@@ -873,9 +883,9 @@ function renderVac(s,c){
   const weeksLeft=viz?52:Math.max(0,Math.floor((dayN(ann)-dayN(today))/7)), avg=(wk[0]+wk[1])/2, crW=r1(avg/div);
   let ps=sick, pv=0; for(let n=0;n<weeksLeft;n++){if(ps<40)ps=r1(ps+crW);else pv=r1(pv+crW);}
   const sickFull=st0.sickE>=40;
-  const tot=+(wk[0]+wk[1]).toFixed(1), src=(who==="mel"&&CAL)?`<b>${fmtD(CAL.start)} \u2013 ${fmtD(CAL.end)}</b> \u00b7 ${tot} hrs worked`:`${tot} hrs worked`;
+  const tot=+(wk[0]+wk[1]).toFixed(1), src=vcal()?`<b>${fmtD(vcal().start)} \u2013 ${fmtD(vcal().end)}</b> \u00b7 ${tot} hrs worked`:`${tot} hrs worked`;
   // Plain-language breakdown: which hours are already in the timekeeping numbers, and what gets added.
-  const inc=asOfWk1(s), pg=CAL&&!viz?fmtD(addD(CAL.start,inc?6:-1)):"", ws=inc?[1]:[0,1];
+  const inc=asOfWk1(s), pg=vcal()&&!viz?fmtD(addD(vcal().start,inc?6:-1)):"", ws=inc?[1]:[0,1];
   const used=(a,w,x)=>r1(wkSum(a,w)*(x||1));
   const wkLine=(per,lbl)=>viz?"hrs":`Week 1: +${per[0]}${inc?` <i>(already in your ${pg} numbers)</i>`:""}<br>Week 2: +${per[1]}${inc?" <i>(new)</i>":""}`;
   const endLine=(base,per,arr,x)=>{const W=viz?[0,1]:ws,e=r1(W.reduce((t,w)=>t+per[w],0)),u=r1(W.reduce((t,w)=>t+used(arr,w,x),0));return `${base} + ${e}${u?` − ${u}`:""}`;};
@@ -890,7 +900,7 @@ function renderVac(s,c){
 function stampHolidays(){if(!CAL)return;DEF.forEach((_,k)=>{if(HOLIDAYS.has(CAL.dates[k]))$("hd"+k).setAttribute("aria-pressed","true");});}
 // Day rules: no regular hours on Sat, Sun or holidays; regular is capped at 8 minus PTO.
 // Extra regular hours move to OT, so the day's total (and pay) never changes.
-function isHolDay(k){return $("hd"+k).getAttribute("aria-pressed")==="true"||!!(who==="mel"&&CAL&&HOLIDAYS.has(CAL.dates[k]));}
+function isHolDay(k){return $("hd"+k).getAttribute("aria-pressed")==="true"||!!(vcal()&&HOLIDAYS.has(vcal().dates[k]));}
 function normalizeDays(){
   const moved=[];
   for(let k=0;k<14;k++){
@@ -917,7 +927,7 @@ function flashGrid(moved){
 }
 function render(){renderQEnd();
   const moved=normalizeDays(); if(document.activeElement&&/^[hop]\d+$/.test(document.activeElement.id||""))flashGrid(moved);
-  read();renderQRoll();renderSick();renderAsOfHint();if(!$("histTab").hidden)renderHist();
+  read();renderQRoll();renderSick();renderAsOfHint();renderSeg();if(!$("histTab").hidden)renderHist();
   const s=state[who];
   // Pay calendar (Current only): first time, stamp this period's union holidays
   if(who==="mel"&&CAL){
@@ -928,11 +938,14 @@ function render(){renderQEnd();
     // Union holidays on the calendar are always marked on Current (locked on)
     DEF.forEach((_,k)=>{if(HOLIDAYS.has(CAL.dates[k]))s.holD[k]=true;});
   }
+  if(who==="prev"&&PCAL)DEF.forEach((_,k)=>{if(HOLIDAYS.has(PCAL.dates[k]))s.holD[k]=true;});
+  if(who==="prev")prevSync();
+  ["q160h","vacBal","sickBal","sickE"].forEach(id=>{const el=$(id),ro=who==="prev";el.readOnly=ro;el.classList.toggle("ro",ro);if(ro)el.value=s[id]??"";});
   const c=calc(s);
   {const qa=$("qAfter"),on=who==="mel"&&!!CAL&&(s.periodId||CAL.id)===CAL.id;qa.hidden=!on;if(on){const wi=weekIdx(),v=+c.qWk[wi].toFixed(1),pe=+c.qEnd.toFixed(1);
     qa.innerHTML=`<span>Quarter OT at end of pay period<small>${pe>=160?"Past 160: extra OT pays 2×":`${+(160-pe).toFixed(1)} hrs to go until 160`}${wi===0?` · after this week: ${v}`:""}${c.qReset?" · new quarter started this period":""}</small></span><b>${pe} hrs</b>`;}}
   $("copyCurRow").hidden=who!=="tif";
-  $("presets").hidden=who==="mel";   // presets are for what-ifs only
+  $("presets").hidden=who!=="tif";   // presets are for what-ifs only
   renderCal(s);
   renderHours(s);
   renderVac(s,c);
@@ -945,8 +958,8 @@ function render(){renderQEnd();
   $("wk2t").textContent=wkT(7,14);
   DEF.forEach((_,k)=>$("dn"+k).setAttribute("aria-pressed",k===selDay));
   [1,2].forEach(w=>{const el=$("dd"+w),on=selDay!==null&&Math.floor(selDay/7)===w-1;el.hidden=!on;if(on)el.textContent=dayText(selDay,s);});
-  $("netCap").textContent=`${PEOPLE[who].name} · take-home this check`;$("sticky").firstElementChild.textContent=who==="tif"?"What-if":"Take-home";
-  if(who==="mel"&&CAL){const ord=["1st","2nd","3rd"][CAL.rank-1]||CAL.rank+"th";$("plateStamp").textContent=`${MON[CAL.pay.getMonth()]} ${ord} check · paid ${CAL.pay.getMonth()+1}/${CAL.pay.getDate()}`;}
+  $("netCap").textContent=who==="prev"?"Pending check · take-home":`${PEOPLE[who].name} · take-home this check`;$("sticky").firstElementChild.textContent=who==="tif"?"What-if":"Take-home";
+  if(vcal()){const C=vcal(),ord=["1st","2nd","3rd"][C.rank-1]||C.rank+"th";$("plateStamp").textContent=`${MON[C.pay.getMonth()]} ${ord} check · paid ${C.pay.getMonth()+1}/${C.pay.getDate()}${who==="prev"?" · pending":""}`;}
   else $("plateStamp").textContent="What-if · not a real check";
   $("dtTag").hidden=!(c.qEnd>=160&&(c.dt>0||c.ot===0)&&!noRate);
   $("net").textContent=noRate?"Add your rate":money(c.net);
@@ -1082,7 +1095,7 @@ $("pMel").onclick=()=>pick("mel"); $("pTif").onclick=()=>pick("tif");
 const KEY="paycheck-calc-v1";
 let dbRef=null, dbLast=null, dbTimer=null, dbBusy=false, dbQueued=false;
 let seen=0, ack=false;
-function payload(){return JSON.stringify({who,state,seen,ack});}
+function payload(){return JSON.stringify({who:who==="prev"?"mel":who,state,seen,ack});}
 function apply(d){if(d&&typeof d.seen==="number")seen=Math.max(seen,d.seen);if(d&&d.ack)ack=true;if(d&&d.state){["mel","tif"].forEach(k=>{if(d.state[k])Object.assign(state[k],d.state[k]);});if(d.who in state)who=d.who;}}
 function save(){
   const p=payload(); let local=false;
@@ -1098,7 +1111,7 @@ async function flush(){
   dbBusy=false; if(dbQueued){dbQueued=false;flush();}
 }
 function load(){try{apply(JSON.parse(localStorage.getItem(KEY)||"null"));}catch(e){}}
-function syncToggle(){$("pMel").setAttribute("aria-pressed",who==="mel");$("pTif").setAttribute("aria-pressed",who==="tif");document.documentElement.classList.toggle("viz",who==="tif");}
+function syncToggle(){$("pMel").setAttribute("aria-pressed",who!=="tif");$("pTif").setAttribute("aria-pressed",who==="tif");document.documentElement.classList.toggle("viz",who==="tif");}
 async function connect(){
   try{
     if(!window.claude||!window.claude.use)return;
@@ -1119,7 +1132,7 @@ function closeDef(){defStage=0;$("defBox").hidden=true;}
 $("reset").onclick=()=>{
   const m=PEOPLE.mel;
   defStage=1; $("defStep").textContent="Step 1 of 2"; $("defTitle").textContent="Reset to default?";
-  $("defMsg").textContent=`This sets the ${PEOPLE[who].name} profile to the starting setup: $${m.rate.toFixed(2)}/hr, ${m.k401}% 401(k), $${m.extra} W-4 extra, $${m.loan} 401(k) loan, married jointly, and the standard deductions. Every day's hours, PTO and holidays go to 0. The other profile isn't changed.`;
+  $("defMsg").textContent=`This sets the ${(PEOPLE[who]||PEOPLE.mel).name} profile to the starting setup: $${m.rate.toFixed(2)}/hr, ${m.k401}% 401(k), $${m.extra} W-4 extra, $${m.loan} 401(k) loan, married jointly, and the standard deductions. Every day's hours, PTO and holidays go to 0. The other profile isn't changed.`;
   $("defGo").textContent="Continue"; $("defBox").hidden=false; try{$("defCancel").focus();}catch(e){}
 };
 $("defGo").onclick=()=>{
@@ -1168,6 +1181,29 @@ function starts(s){
   if(o.sick!==null)o.sick=r1(raw.sick-cS+wkSum(s.sickD,0));
   return o;
 }
+
+// ----- Pending check view: the last pay period, still waiting to be paid, shown like Current -----
+Object.defineProperty(state,"prev",{enumerable:false,configurable:true,get(){const H=state.mel.hist||[],h=H.find(x=>x.pid===PPID);return h?h.p:null;}});
+function pendingInfo(){if(!CAL)return null;const st=addD(CAL.start,-14),pay=calFor(st).pay;return dayN(pay)>=dayN(new Date())?{pid:ymd(st),st,pay}:null;}
+function addPastEntry(pid,vals,prevPeriod){const s=state.mel,H=s.hist||(s.hist=[]),[y,m,d]=pid.split("-").map(Number),os=new Date(y,m-1,d);
+  const e={pid,pay:ymd(calFor(os).pay)};if(prevPeriod){const st=starts(s);e.qEnd=st.q;if(st.vac!==null)e.vacEnd=st.vac;if(st.sick!==null)e.sickEnd=st.sick;}
+  H.push(e);H.sort((a,b)=>a.pid<b.pid?1:-1);const i=H.indexOf(e);legacyInit(i,vals);const n=H[i];n.fill=true;if(!prevPeriod){delete n.qEnd;delete n.vacEnd;delete n.sickEnd;}s.hist=H.slice(0,26);return n;}
+function renderSeg(){
+  const pi=pendingInfo(), on=!!pi&&(who==="mel"||who==="prev")&&state.mel.periodId===CAL.id;
+  $("perSeg").hidden=!on; if(!on&&who==="prev"){who="mel";PPID=null;write();}
+  if(!on)return;
+  $("segCur").innerHTML=`This pay period<small>paid ${fmtD(CAL.pay)}</small>`;
+  $("segPrev").innerHTML=`Pending check<small>paid ${fmtD(pi.pay)}</small>`;
+  $("segCur").setAttribute("aria-selected",String(who==="mel")); $("segPrev").setAttribute("aria-selected",String(who==="prev"));
+  $("reset").hidden=who==="prev";
+}
+// Edits made in the pending view: recalc that check and carry the change forward to today's numbers.
+function prevSync(){const H=state.mel.hist||[],i=H.findIndex(x=>x.pid===PPID);if(i<0)return;saveHistEdit(i,{},true);}
+$("segPrev").onclick=()=>{if(who==="prev")return;const pi=pendingInfo();if(!pi)return;read();
+  const s=state.mel;if(!(s.hist||[]).some(h=>h.pid===pi.pid)){const n=addPastEntry(pi.pid,{hours:Array(14).fill(0),otD:Array(14).fill(0),pto:Array(14).fill(0),sickD:Array(14).fill(0),holD:Array(14).fill(false)},true);n.fill=true;}
+  const h=s.hist.find(x=>x.pid===pi.pid); if(!h.p){const i=s.hist.indexOf(h);legacyInit(i,{hours:Array(14).fill(0),otD:Array(14).fill(0),pto:Array(14).fill(0),sickD:Array(14).fill(0),holD:Array(14).fill(false)});s.hist[i].fill=true;}
+  PPID=pi.pid;PCAL=calFor(pi.st);who="prev";selDay=null;write();save();render();};
+$("segCur").onclick=()=>{if(who!=="prev")return;read();who="mel";PPID=null;selDay=null;write();render();};
 // Sick row stays tucked away until someone needs it (or already has sick hours entered).
 
 function renderAsOfHint(){
@@ -1217,7 +1253,7 @@ function addEnds(){const s=state.mel,h=(s.hist||[])[0];if(!h||h.p)return;if(h.qE
 
 // An entry saved before daily hours were kept: take the hours now, and work out its starting numbers
 // from the end numbers it already has, so nothing else moves.
-function legacyInit(i,vals){
+function legacyInit(i,vals,noSave){
   const s=state.mel,h=s.hist[i],[y,m,d]=h.pid.split("-").map(Number),os=new Date(y,m-1,d);
   const pr=JSON.parse(JSON.stringify(s)); ["hist","myPresets","holStash","qRoll","lRoll","anch"].forEach(k=>delete pr[k]);
   Object.assign(pr,vals); if(!vals.holD)pr.holD=Array(14).fill(false); pr.q160h="0"; pr.vacBal="0"; pr.sickBal="0";
@@ -1231,7 +1267,7 @@ function legacyInit(i,vals){
   pr.vacBal=h.vacEnd!=null?String(r1(h.vacEnd-z.vacEnd)):""; pr.sickBal=h.sickEnd!=null?String(r1(h.sickEnd-z.sickEnd)):"";
   const n=histFigures(pr,os); s.hist[i]=Object.assign({pid:h.pid,p:pr,st:{q:num(pr.q160h,0),sickE:num(pr.sickE,0),vac:pr.vacBal===""?null:num(pr.vacBal,0),sick:pr.sickBal===""?null:num(pr.sickBal,0)}},n);
   if(h.qEnd!=null)s.hist[i].qEnd=h.qEnd; if(h.vacEnd!=null)s.hist[i].vacEnd=h.vacEnd; if(h.sickEnd!=null)s.hist[i].sickEnd=h.sickEnd;
-  save();
+  if(!noSave)save();
 }
 
 // Add a past pay period by hand (for periods that ended before History existed, or got cleared).
@@ -1261,18 +1297,15 @@ function renderHistAdd(){
   $("histAddX").onclick=()=>{box.hidden=true;renderHistAdd();};
   $("histAddSave").onclick=()=>{
     const pid=$("histAddSel").value,vals=gridVals(box),[y,m,d]=pid.split("-").map(Number),os=new Date(y,m-1,d);
-    const prev=ymd(addD(CAL.start,-14))===pid, H=s.hist||(s.hist=[]);
-    const e={pid,pay:ymd(calFor(os).pay)};
-    if(prev){const st=starts(s);e.qEnd=st.q;if(st.vac!==null)e.vacEnd=st.vac;if(st.sick!==null)e.sickEnd=st.sick;}
-    H.push(e);H.sort((a,b)=>a.pid<b.pid?1:-1);const i=H.indexOf(e);
-    legacyInit(i,vals);
-    const n=H[i]; if(!prev){delete n.qEnd;delete n.vacEnd;delete n.sickEnd;}
-    n._open=true;n._msg=`Added. Take-home for this period: ${money(n.net)}.${prev?" Your current quarter OT and PTO numbers didn't change.":""}`;
-    s.hist=H.slice(0,26);save();box.hidden=true;renderHist();renderHistAdd();};
+    const prev=ymd(addD(CAL.start,-14))===pid;
+    const n=addPastEntry(pid,vals,prev);
+    n._open=true;n._msg=`Added. Take-home for this period: ${money(n.net)}.${prev?" Today's quarter OT and PTO already count these hours, so they didn't change.":""}`;
+    save();box.hidden=true;renderHist();renderHistAdd();};
 }
 $("histAdd").onclick=()=>{const b=$("histAddBox");b.hidden=!b.hidden;renderHistAdd();};
 // Save edited hours for a past period, then carry the change forward to later periods and today's numbers.
-function saveHistEdit(i,vals){
+function saveHistEdit(i,vals,quiet){
+  {const h0=state.mel.hist[i];if(h0&&h0.fill){const P=h0.p,v={hours:P.hours.slice(),otD:(P.otD||[]).slice(),pto:(P.pto||[]).slice(),sickD:(P.sickD||[]).slice(),holD:(P.holD||[]).slice()};Object.assign(v,vals);legacyInit(i,v,true);const nh=state.mel.hist[i];Object.keys(P).forEach(k=>delete P[k]);Object.assign(P,nh.p);nh.p=P;nh.fill=true;if(!quiet){write();save();render();}return {dQ:0,dV:0,dS:0};}}
   const s=state.mel,H=s.hist,h=H[i],[y,m,d]=h.pid.split("-").map(Number),os=new Date(y,m-1,d);
   Object.assign(h.p,vals); const n=histFigures(h.p,os);
   const dQ=r1(n.qEnd-(h.qEnd||0)), dV=(n.vacEnd!=null&&h.vacEnd!=null)?r1(n.vacEnd-h.vacEnd):0, dS=(n.sickEnd!=null&&h.sickEnd!=null)?r1(n.sickEnd-h.sickEnd):0, dE=r1(n.sickEEnd-(h.sickEEnd??n.sickEEnd));
@@ -1286,7 +1319,7 @@ function saveHistEdit(i,vals){
   if(dV&&s.vacBal!==""&&s.vacBal!=null)s.vacBal=String(r1(num(s.vacBal,0)+dV));
   if(dS&&s.sickBal!==""&&s.sickBal!=null)s.sickBal=String(r1(num(s.sickBal,0)+dS));
   if(dE)s.sickE=String(r1(num(s.sickE,0)+dE));
-  write(); save(); render(); return {dQ,dV,dS};
+  if(!quiet){write(); save(); render();} return {dQ,dV,dS};
 }
 function renderHist(){
   const L=state.mel.hist||[], el=$("histList"); el.textContent="";
@@ -1315,7 +1348,7 @@ function renderHist(){
       f.querySelector(".hcancel").onclick=()=>{f.hidden=true;};
       f.querySelector(".hsave").onclick=()=>{const vals=gridVals(f);
 
-        if(!h.p){legacyInit(i,vals);const nh=state.mel.hist[i];nh._open=true;nh._msg=`Saved. Take-home for this period: ${money(nh.net)}. It keeps its daily hours now, so later edits carry forward.`;renderHist();return;}
+        if(!h.p||h.fill){if(!h.p)legacyInit(i,vals);else saveHistEdit(i,vals,true);const nh=state.mel.hist[i];nh.fill=true;save();nh._open=true;nh._msg=`Saved. Take-home for this period: ${money(nh.net)}. Today's quarter OT and PTO already count these hours, so they didn't change.`;renderHist();return;}
         const old=h.net,r=saveHistEdit(i,vals),nh=state.mel.hist[i],bits=[];
         bits.push(`Take-home ${money(old)} → ${money(nh.net)}`); if(r.dQ)bits.push(`quarter OT ${r.dQ>0?"+":""}${r.dQ}`); if(r.dV)bits.push(`vacation ${r.dV>0?"+":""}${r.dV}`); if(r.dS)bits.push(`sick ${r.dS>0?"+":""}${r.dS}`);
         nh._open=true; nh._msg=`Saved. ${bits.join(" · ")}${(r.dQ||r.dV||r.dS)?". Later periods and today's numbers were updated too.":"."}`; renderHist();};
@@ -1388,7 +1421,7 @@ $("xCopy").onclick=()=>{
   const fail=()=>{try{box.focus();box.select();}catch(e){}$("xMsg").textContent="Copy the code in the box (it's selected), then paste it into Notes or a text to yourself.";};
   try{navigator.clipboard.writeText(code).then(done,fail);}catch(e){fail();}
 };
-$("xLoadOpen").onclick=()=>{const box=$("xBox");box.hidden=false;box.readOnly=false;box.value="";$("xLoad").hidden=false;$("xMsg").textContent=`Paste a setup code. It replaces the setup on ${PEOPLE[who].name}; your hours stay.`;try{box.focus();}catch(e){}};
+$("xLoadOpen").onclick=()=>{const box=$("xBox");box.hidden=false;box.readOnly=false;box.value="";$("xLoad").hidden=false;$("xMsg").textContent=`Paste a setup code. It replaces the setup on ${(PEOPLE[who]||PEOPLE.mel).name}; your hours stay.`;try{box.focus();}catch(e){}};
 $("xLoad").onclick=()=>confirmTap($("xLoad"),()=>{
   let o; try{o=dec($("xBox").value);}catch(e){$("xMsg").textContent="That code didn't work. Copy the whole code, starting with PAY1-, and try again.";return;}
   read(); const s=state[who]; let n=0; SETUP_KEYS.forEach(k=>{if(o[k]!==undefined){s[k]=o[k];n++;}});
@@ -1412,7 +1445,7 @@ $("copyCur").onclick=()=>confirmTap($("copyCur"),()=>{
 });
 $("tabPay").onclick=()=>showTab("pay"); $("tabHrs").onclick=()=>showTab("hrs"); $("tabVac").onclick=()=>showTab("vac"); $("tabHist").onclick=()=>showTab("hist");
 [["senM","senD",2],["senD","senY",2]].forEach(([a,b,n])=>$(a).addEventListener("input",()=>{if($(a).value.replace(/\D/g,"").length>=n)$(b).focus();}));
-$("hDay").addEventListener("change",()=>{const k=+$("hDay").value;$("hHol").checked=(who==="mel"&&CAL)?HOLIDAYS.has(CAL.dates[k]):$("hd"+k).getAttribute("aria-pressed")==="true";$("hMsg").textContent="";render();});
+$("hDay").addEventListener("change",()=>{const k=+$("hDay").value;$("hHol").checked=vcal()?HOLIDAYS.has(vcal().dates[k]):$("hd"+k).getAttribute("aria-pressed")==="true";$("hMsg").textContent="";render();});
 $("hAdd").onclick=()=>{const s=state[who],h=hoursCalc(s);if(!h)return;{const rg=+h.d.st.toFixed(1);$("h"+h.k).value=rg;$("o"+h.k).value=+(h.w-rg).toFixed(1)||"";}$("p"+h.k).value=h.p||"";$("hd"+h.k).setAttribute("aria-pressed",h.hol);selDay=h.k;render();$("hMsg").textContent=`Put on ${dayLabel(h.k)}: ${h.w} hrs worked${h.p?`, ${h.p} PTO`:""}${h.hol?", holiday":""}. Switch to Paycheck to see your check.`;};
 $("npKeep").onclick=()=>{read();snapPeriod();rollLeave();rollQuarter();addEnds();state.mel.anch=CAL.id;state.mel.periodId=CAL.id;render();};
 // Keep the calendar on today's date: recheck every minute and whenever the app comes back to the screen
@@ -1421,9 +1454,10 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=25;
+const NOTES_VERSION=26;
 const NOTES=[
-  "History: Edit hours and Add a past pay period now use the same week grid as the Paycheck tab, including holidays"
+  "Paycheck tab: switch between This pay period and Pending check, so you can see the check you're still waiting on exactly like the new one",
+  "Past periods you type in by hand don't change today's quarter OT or PTO, since your timekeeping page already counts those hours"
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

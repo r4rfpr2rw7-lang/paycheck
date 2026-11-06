@@ -77,6 +77,7 @@ input:focus-visible,select:focus-visible,button:focus-visible,[role=button]:focu
 .hist .hdet p{display:flex;justify-content:space-between;gap:8px;margin:0;padding:5px 0;border-top:1px dotted var(--line);font-size:14.5px;font-weight:600}
 .hist .hdet p span:last-child{white-space:nowrap}
 .hist .hdet .hh{border-top:0;color:var(--muted);font-size:13.5px}
+.hist .hdet .hh span{white-space:normal!important}
 .hist .hdet p.t{font-weight:900}
 .hist .hdel{margin-top:8px;background:none;border:0;color:var(--warn);font:700 13px var(--f-body);text-decoration:underline;cursor:pointer;padding:4px 0}
 .hist .hbtns{display:flex;gap:10px;align-items:center;margin-top:8px}
@@ -937,6 +938,7 @@ function render(){renderQEnd();
     if(s.anch===undefined){const [y,m,d]=s.periodId.split("-").map(Number);s.anch=s.periodId===CAL.id?ymd(addD(CAL.start,7*weekIdx())):ymd(addD(new Date(y,m-1,d),7));}
     // Union holidays on the calendar are always marked on Current (locked on)
     DEF.forEach((_,k)=>{if(HOLIDAYS.has(CAL.dates[k]))s.holD[k]=true;});
+    addRollStub(s);
   }
   if(who==="prev"&&PCAL)DEF.forEach((_,k)=>{if(HOLIDAYS.has(PCAL.dates[k]))s.holD[k]=true;});
   if(who==="prev")prevSync();
@@ -1265,11 +1267,24 @@ function legacyInit(i,vals,noSave){
   const z=histFigures(pr,os);
   pr.q160h=String(Math.max(0,r1((h.qEnd||0)-z.qEnd)));
   pr.vacBal=h.vacEnd!=null?String(r1(h.vacEnd-z.vacEnd)):""; pr.sickBal=h.sickEnd!=null?String(r1(h.sickEnd-z.sickEnd)):"";
-  const n=histFigures(pr,os); s.hist[i]=Object.assign({pid:h.pid,p:pr,st:{q:num(pr.q160h,0),sickE:num(pr.sickE,0),vac:pr.vacBal===""?null:num(pr.vacBal,0),sick:pr.sickBal===""?null:num(pr.sickBal,0)}},n);
+  const n=histFigures(pr,os); s.hist[i]=Object.assign({pid:h.pid,fill:(h.fill||h.stub)?true:undefined,p:pr,st:{q:num(pr.q160h,0),sickE:num(pr.sickE,0),vac:pr.vacBal===""?null:num(pr.vacBal,0),sick:pr.sickBal===""?null:num(pr.sickBal,0)}},n);
   if(h.qEnd!=null)s.hist[i].qEnd=h.qEnd; if(h.vacEnd!=null)s.hist[i].vacEnd=h.vacEnd; if(h.sickEnd!=null)s.hist[i].sickEnd=h.sickEnd;
   if(!noSave)save();
 }
 
+
+// People who started a new pay period before History existed: their hours are gone, but the rollover kept
+// a note (OT added, PTO used/earned, ending numbers). Put that period in History so it isn't missing.
+function addRollStub(s){
+  if(!CAL||s.periodId!==CAL.id)return;
+  const prevPid=ymd(addD(CAL.start,-14)),qr=s.qRoll,lr=s.lRoll;
+  if(!((qr&&qr.from===prevPid&&qr.to===CAL.id)||(lr&&lr.from===prevPid&&lr.to===CAL.id)))return;
+  if((s.hist||[]).some(h=>h.pid===prevPid)||s.stubDone===prevPid)return;
+  const [y,m,d]=prevPid.split("-").map(Number),st=starts(s),e={pid:prevPid,pay:ymd(calFor(new Date(y,m-1,d)).pay),stub:true};
+  if(qr&&qr.from===prevPid){e.otAdd=qr.add;e.qEnd=st.q;}
+  if(lr&&lr.from===prevPid){e.vacEarned=lr.toV;e.sickEarned=lr.toS;e.vacUsedS=lr.vacUsed;e.sickUsedS=lr.sickUsed;if(st.vac!==null)e.vacEnd=st.vac;if(st.sick!==null)e.sickEnd=st.sick;}
+  (s.hist||(s.hist=[])).push(e);s.hist.sort((a,b)=>a.pid<b.pid?1:-1);s.stubDone=prevPid;
+}
 // Add a past pay period by hand (for periods that ended before History existed, or got cleared).
 // Same layout as the Paycheck tab: days across (Fri → Thu), rows for Regular, OT, Vacation, Sick, Holiday.
 function hoursGrid(os,P){P=P||{};const g=(a,k)=>+((P[a]||[])[k])||0;let out="";
@@ -1330,13 +1345,20 @@ function renderHist(){
     if(h.p&&h.vacEarned===undefined){const f=histFigures(h.p,os);h.vacEarned=f.vacEarned;h.sickEarned=f.sickEarned;}
     const row=(a,b,cl)=>`<p${cl?` class="${cl}"`:""}><span>${a}</span><span>${b}</span></p>`;
     const dt=document.createElement("details"); if(h._open)dt.open=true;
+    if(h.stub&&!h.p){
+      dt.innerHTML=`<summary><span>${md(os)} – ${md(addD(os,13))}<small>Paid ${md(new Date(py,pm-1,pd))} · hours not saved</small></span><b>–</b></summary><div class="hdet">`+
+        `<p class="hh"><span>This period ended before History was added, so its daily hours weren't kept. Tap Edit hours to add them and see this check.</span></p>`+
+        (h.otAdd!=null?row("Quarter OT added",`+${h.otAdd} hrs`):"")+(h.vacEarned!=null?row("Vacation earned",`+${h.vacEarned} hrs`)+row("Sick leave earned",`+${h.sickEarned} hrs`)+row("Vacation used",`${h.vacUsedS} hrs`)+row("Sick used",`${h.sickUsedS} hrs`):"")+
+        (h.qEnd!=null?row("Quarter OT at end",h.qEnd+" hrs"):"")+(h.vacEnd!=null?row("Vacation at end",h.vacEnd+" hrs"):"")+(h.sickEnd!=null?row("Sick at end",h.sickEnd+" hrs"):"")+
+        `<div class="hbtns"><button type="button" class="mini hedit">Edit hours</button><button type="button" class="hdel">Delete</button></div><div class="hform" hidden></div></div>`;
+    }else{
     dt.innerHTML=`<summary><span>${md(os)} – ${md(addD(os,13))}<small>Paid ${md(new Date(py,pm-1,pd))}</small></span><b>${money(h.net)}</b></summary><div class="hdet">`+`<p class="hh"><span>${h.reg} Reg · ${r1(h.ot+h.dt)} OT · ${h.vac} Vac · ${h.sick} Sick</span></p>`+
       row("Straight time",money(h.stPay))+row(`OT 1.5× (${h.ot} hrs)`,money(h.otPay))+row(`Double time (${h.dt} hrs)`,money(h.dtPay))+
       row("Gross",money(h.gross),"t")+row("Federal income tax","−"+money(h.fed))+row("Social Security + Medicare","−"+money(h.fica))+row("Everything else","−"+money(h.other))+
       row("Take-home",money(h.net),"t")+
       (h.vacEarned!=null?row("Vacation earned","+"+h.vacEarned+" hrs")+row("Sick leave earned","+"+h.sickEarned+" hrs"):(()=>{const sd=parseDateMDY((h.p||state.mel).senDate);if(!sd)return row("PTO earned","add seniority date");const T=r1((h.reg+h.ot+h.dt)/vacDivisor(yrsBetween(sd,addD(os,13))));return row("PTO earned (vacation + sick)","+"+T+" hrs");})())+(h.qEnd!==undefined?row("Quarter OT at end",h.qEnd+" hrs"):"")+(h.vacEnd!==undefined?row("Vacation at end",h.vacEnd+" hrs"):"")+(h.sickEnd!==undefined?row("Sick at end",h.sickEnd+" hrs"):"")+
       (h._msg?`<p class="hmsg">${h._msg}</p>`:"")+
-      `<div class="hbtns"><button type="button" class="mini hedit">Edit hours</button><button type="button" class="hdel">Delete</button></div><div class="hform" hidden></div></div>`;
+      `<div class="hbtns"><button type="button" class="mini hedit">Edit hours</button><button type="button" class="hdel">Delete</button></div><div class="hform" hidden></div></div>`;}
     delete h._open; delete h._msg;
     const del=dt.querySelector(".hdel"); del.addEventListener("click",()=>confirmTap(del,()=>{state.mel.hist.splice(i,1);save();renderHist();}));
     const ed=dt.querySelector(".hedit");
@@ -1454,10 +1476,10 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=26;
+const NOTES_VERSION=27;
 const NOTES=[
-  "Paycheck tab: switch between This pay period and Pending check, so you can see the check you're still waiting on exactly like the new one",
-  "Past periods you type in by hand don't change today's quarter OT or PTO, since your timekeeping page already counts those hours"
+  "If you started this pay period before History existed, your last period is now in History. Its daily hours weren't saved, so tap Edit hours (or Pending check on the Paycheck tab) to add them and see that check",
+  "Paycheck tab: switch between This pay period and Pending check to see the check you're still waiting on"
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

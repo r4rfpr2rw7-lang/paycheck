@@ -897,9 +897,15 @@ function renderVac(s,c){
   const addV=inc?perV[1]:toVac, addS=inc?perS[1]:toSick, sub=viz||!VC?"hrs":inc?rng(addD(VC.start,7),VC.end):rng(VC.start,VC.end), endLbl=viz||!VC?"at end of pay period":`by ${mdy(VC.end)}`;
   let nowBox="";
   if(who==="mel"&&VC&&!viz&&(s.periodId||CAL.id)===CAL.id&&(st0.vac!==null||st0.sick!==null)){
-    const tN=dayN(new Date()),done=w=>dayN(addD(VC.start,7*w+6))<tN,usedTo=a=>{let t=0;for(let k=0;k<14;k++){const [y,m,d]=VC.dates[k].split("-").map(Number);if(dayN(new Date(y,m-1,d))<=tN)t+=+(a||[])[k]||0;}return t;};
-    const vNow=st0.vac===null?null:r1(st0.vac+[0,1].reduce((t,w)=>t+(done(w)?perV[w]:0),0)-usedTo(s.pto)*vx);
-    const sNow=st0.sick===null?null:r1(st0.sick+[0,1].reduce((t,w)=>t+(done(w)?perS[w]:0),0)-usedTo(s.sickD));
+    // "Now" works like the timekeeping page: hours used come off the day they're used; earned hours only show up
+    // once the page posts them, on the Tuesday after each week ends.
+    const tN=dayN(new Date()),posted=endDate=>dayN(endDate)+5<=tN,done=w=>posted(addD(VC.start,7*w+6)),usedTo=a=>{let t=0;for(let k=0;k<14;k++){const [y,m,d]=VC.dates[k].split("-").map(Number);if(dayN(new Date(y,m-1,d))<=tN)t+=+(a||[])[k]||0;}return t;};
+    // The start-of-period numbers include last period's final week. If that week isn't posted yet, take its credit back out.
+    let unV=0,unS=0;
+    if(!posted(addD(VC.start,-1))){const ph=(s.hist||[]).find(x=>x.pid===ymd(addD(VC.start,-14))),sd=parseDateMDY(s.senDate);
+      if(ph&&ph.p&&sd){const div=vacDivisor(yrsBetween(sd,addD(VC.start,-1)));let se=Math.max(0,num(ph.p.sickE,0));[0,1].forEach(w=>{const cr=r1(wkWorked(ph.p,w)/div);if(se<40){se=r1(se+cr);if(w===1)unS=cr;}else if(w===1)unV=cr;});}}
+    const vNow=st0.vac===null?null:r1(st0.vac-unV+[0,1].reduce((t,w)=>t+(done(w)?perV[w]:0),0)-usedTo(s.pto)*vx);
+    const sNow=st0.sick===null?null:r1(st0.sick-unS+[0,1].reduce((t,w)=>t+(done(w)?perS[w]:0),0)-usedTo(s.sickD));
     nowBox=`<div class="hbig hnow"><div><span>Vacation now</span><b>${vNow===null?"–":vNow}</b><small>today, ${mdy(new Date())}</small></div><div><span>Sick now</span><b>${sNow===null?"–":sNow}</b><small>today, ${mdy(new Date())}</small></div></div>`;}
   el.innerHTML=`<p class="vsrc">${src}</p>${nowBox}<div class="hbig"><div class="otw"><span>Vacation earned</span><b>${addV}</b><small>${sub}</small></div><div class="pto"><span>Sick leave earned</span><b>${addS}</b><small>${sick>=40?"full for the year":`${r1(sick)} of 40 this year`}</small></div>`+
     `<div><span>Vacation ${endLbl}</span><b>${bal===null?"–":bal}</b><small>${bal===null?"add your balance above":endLine(viz?st0.vac:rawV,perV,s.pto,vx)}</small></div><div><span>Sick ${endLbl}</span><b>${sbal===null?"–":sbal}</b><small>${sbal===null?"add your balance above":endLine(viz?st0.sick:rawS,perS,s.sickD,1)}</small></div></div>`+
@@ -1371,7 +1377,7 @@ function renderHist(){
   const box=document.createElement("div"); box.className="hist";
   const md=x=>x.toLocaleDateString("en-US",{month:"short",day:"numeric"});
   L.forEach((h,i)=>{const [y,m,d]=h.pid.split("-").map(Number),os=new Date(y,m-1,d),[py,pm,pd]=h.pay.split("-").map(Number);
-    if(h.p&&h.vacEarned===undefined){const f=histFigures(h.p,os);h.vacEarned=f.vacEarned;h.sickEarned=f.sickEarned;}
+    if(h.p&&(h.vacEarned===undefined||h.reg===undefined||!isFinite(h.net))){const f=histFigures(h.p,os);for(const k in f)if(h[k]===undefined||(k==="net"&&!isFinite(h.net))||["reg","ot","dt","vac","sick","stPay","otPay","dtPay","gross","fed","fica","other"].includes(k)&&!isFinite(h[k]))h[k]=f[k];}
     const row=(a,b,cl)=>`<p${cl?` class="${cl}"`:""}><span>${a}</span><span>${b}</span></p>`;
     const dt=document.createElement("details"); if(h._open)dt.open=true;
     if(h.stub&&!h.p){
@@ -1505,10 +1511,9 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=28;
+const NOTES_VERSION=29;
 const NOTES=[
-  "PTO tab: see your vacation and sick hours right now, what you'll earn this pay period, and where you'll be at the end of it, with real dates",
-  "The “as of” date now follows the timekeeping page, which updates on Tuesday. If you copy your numbers Friday to Monday, the calculator adds the week the page is still missing from History"
+  "Vacation now and Sick now work like the timekeeping page: hours you use come off that day, and hours you earn show up on the Tuesday after each week"
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

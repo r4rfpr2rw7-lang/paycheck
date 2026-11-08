@@ -444,7 +444,7 @@ td{font-weight:600}
       <p class="label">This check</p>
       <label class="check" id="duesRow"><input type="checkbox" id="dues" checked> <span>Union dues + MNPL come out this check (every other check)</span></label>
       <p class="hint" id="duesAuto" hidden></p>
-      <div class="row"><div class="field"><label for="q160h">Quarter OT (Current Quarter Hours)</label><input id="q160h" type="number" step="0.5" min="0" placeholder="0"></div></div>
+      <div class="row"><div class="field"><label for="q160h">Quarter OT (Current Quarter Hours)</label><input id="q160h" type="number" step="0.5" min="0" placeholder="0"></div><div class="field"><label for="consW">Consecutive Weekends</label><input id="consW" type="number" step="1" min="0" inputmode="numeric" placeholder="0"></div></div>
       <p class="hint asofh" id="asOfQ" hidden></p>
       <p class="qafter" id="qAfter" hidden></p>
       <p class="hint qend" id="qRollNote" hidden></p>
@@ -637,15 +637,25 @@ let selDay=null;
 // Paid time off for a day = vacation + sick (both pay 1× and fill the day's first 8)
 const ptoAt=(p,k)=>(+(p.pto||[])[k]||0)+(+(p.sickD||[])[k]||0);
 const ptoIn=k=>(+$("p"+k).value||0)+(+$("sk"+k).value||0);
+
+// Consecutive weekends worked, from the timekeeping page, lined up to the start of this pay period (same "as of" rules as quarter OT).
+function consStart(p){const raw=Math.max(0,Math.floor(num(p.consW,0)));if(p!==state.mel||!CAL)return raw;const off=anchOff(p);
+  const wk=(s,w)=>[5,6].some(i=>((+s.hours[w*7+i]||0)+(+(s.otD||[])[w*7+i]||0))>0);
+  if(off===1)return wk(p,0)?Math.max(0,raw-1):0;
+  if(off===-1){const pid=p.periodId||CAL.id,[y,m,d]=pid.split("-").map(Number),h=(p.hist||[]).find(x=>x.pid===ymd(addD(new Date(y,m-1,d),-14)));if(h&&h.p)return wk(h.p,1)?raw+1:0;}
+  return raw;}
 // One day under the union rules. i = 0 Mon … 4 Fri, 5 Sat, 6 Sun.
 // Weekday: PTO + worked fill the first 8 at 1×, next 2 at 1.5×, rest 2×.
 // Holiday: 8 hrs holiday pay at 1× + every worked hour at 2×.
-function dayPay(i,h,p,hol){
+// Contract 8.2(j): every paid hour earns PTO credit — hours worked (OT counts 1:1), vacation, sick and 8 hrs holiday pay.
+// 8.2(h): on 3rd shift, hours worked count 8 for every 6.5.
+function paidHrs(s,k){const i=k%7,w=(+s.hours[k]||0)+(+(s.otD||[])[k]||0);return (s.shift3?w*8/6.5:w)+(+(s.pto||[])[k]||0)+(+(s.sickD||[])[k]||0)+(((s.holD||[])[k]&&i<5)?8:0);}
+function dayPay(i,h,p,hol,sh3){
   h=Math.max(0,+h||0); p=Math.max(0,+p||0);
   const d={st:0,pto:p,ot:0,dt:0,holH:0,holW:0,worked:h};
   if(hol&&i<5){d.holH=8;d.holW=h;}   // a holiday on Sat/Sun pays normal weekend rates, no holiday pay
-  else if(i<5){const s=Math.min(h,Math.max(0,8-p));d.st=s;const rem=h-s;d.ot=Math.min(rem,2);d.dt=Math.max(rem-2,0);}
-  else if(i===5){d.ot=Math.min(h,8);d.dt=Math.max(h-8,0);}
+  else if(i<5){const s=Math.min(h,Math.max(0,8-p));d.st=s;const rem=h-s,x=sh3?1.5:2;d.ot=Math.min(rem,x);d.dt=Math.max(rem-x,0);}
+  else if(i===5){const x=sh3?6.5:8;d.ot=Math.min(h,x);d.dt=Math.max(h-x,0);}
   else d.dt=h;
   return d;
 }
@@ -658,8 +668,13 @@ function calc(p,calOv){
   // 160-hr rule, day by day in pay-period order (Fri → Thu, week 1 then week 2).
   // All OT counts toward 160 (holidays too); 1.5× hours past 160 become 2×.
   let cum=p.q160h!==undefined?starts(p).q:(p.q160?160:0); const q0=cum; const days=[], qWk=[]; let qReset=false, qAt=0;
+  // A weekend right after 3 weekends in a row worked pays 2× for every hour (contract 6.10(e)(2)).
+  let cons=consStart(p); const wkndDbl=[false,false];
+  [0,7].forEach((w,j)=>{const worked=[5,6].some(i=>((+p.hours[w+i]||0)+(+(p.otD||[])[w+i]||0))>0);wkndDbl[j]=worked&&cons>=3;cons=worked?cons+1:0;});
+  const consEnd=cons;
   for(const w of [0,7]) for(const i of ORDER){
-    const k=w+i, d=dayPay(i,(+p.hours[k]||0)+(+(p.otD||[])[k]||0),P[k],H[k]);
+    const k=w+i, d=dayPay(i,(+p.hours[k]||0)+(+(p.otD||[])[k]||0),P[k],H[k],!!p.shift3);
+    if(i>4&&wkndDbl[w/7]){d.dt+=d.ot;d.ot=0;}
     // Budget quarter ends inside this period: the count restarts at 0 the day after
     if(cal&&cal.qOff!==null&&!qReset&&w+ORDER.indexOf(i)>cal.qOff){qAt=cum;cum=0;qReset=true;}
     const keep=Math.min(d.ot,Math.max(0,160-cum)); d.dt+=d.ot-keep; d.ot=keep; cum+=d.ot+d.dt+d.holW;
@@ -695,12 +710,12 @@ function calc(p,calOv){
   const dues=cal?((cal.duesOn?duesM:0)+(cal.mnplOn?mnplM:0)):(p.dues?duesM+mnplM:0);
   const loan=+p.loan||0;
   const net=gross-med-k-fed-fica-pfml-ltc-lni-dues-loan-oPost-espp-kR-kA;
-  return {kR,kA,cal,qReset,qAt,qWk,espp,esppPct,days,q0,qEnd,oPre,oPost,credit,st,pto,ot,dt,leave,holH,holW,holPay,worked,r,stPay,otPay,dtPay,gross,k,ftg,fedBase,fed,med,ytd,room,ss,mc,mcAdd,fica,pfml,ltc,lni,duesM,mnplM,dues,loan,net};
+  return {kR,kA,cal,qReset,qAt,qWk,wkndDbl,consEnd,espp,esppPct,days,q0,qEnd,oPre,oPost,credit,st,pto,ot,dt,leave,holH,holW,holPay,worked,r,stPay,otPay,dtPay,gross,k,ftg,fedBase,fed,med,ytd,room,ss,mc,mcAdd,fica,pfml,ltc,lni,duesM,mnplM,dues,loan,net};
 }
 
 function read(){
   const s=state[who];
-  s.step2=$("step2").checked; s.q160h=$("q160h").value;
+  s.step2=$("step2").checked; s.q160h=$("q160h").value; s.consW=$("consW").value;
   {const m=$("senM").value.replace(/\D/g,""),d=$("senD").value.replace(/\D/g,""),y=$("senY").value.replace(/\D/g,"");s.senDate=(m||d||y)?`${m}/${d}/${y}`:"";} s.senYrs=$("senYrs").value; s.sickE=$("sickE").value; s.vacBal=$("vacBal").value; s.sickBal=$("sickBal").value; s.shift3=$("shift3").checked;
   s.hsS=$("hsS").value; s.hsE=$("hsE").value; s.hsL=$("hsL").value; s.hIn=$("hIn").value; s.hOut=$("hOut").value; s.hClaim=$("hLunch").checked; s.hHol=$("hHol").checked;
   if($("hDay").value!=="")s.hDay=+$("hDay").value;
@@ -724,7 +739,7 @@ function write(){
   {const pt=String(s.senDate||"").split(/[\/\-.]/);$("senM").value=pt[0]||"";$("senD").value=pt[1]||"";$("senY").value=pt[2]||"";} $("senYrs").value=s.senYrs??""; $("sickE").value=s.sickE??""; $("vacBal").value=s.vacBal??""; $("sickBal").value=s.sickBal??""; $("shift3").checked=!!s.shift3;
   $("hDay").value=s.hDay; $("hsS").value=s.hsS||"6:00"; $("hsE").value=s.hsE||"2:30"; $("hsL").value=s.hsL??30;
   $("hIn").value=s.hIn||""; $("hOut").value=s.hOut||""; $("hLunch").checked=!!s.hClaim; $("hHol").checked=!!s.hHol;
-  $("step2").checked=!!s.step2; $("q160h").value=s.q160h??(s.q160?160:"");
+  $("step2").checked=!!s.step2; $("q160h").value=s.q160h??(s.q160?160:""); $("consW").value=s.consW??"";
   $("espp").value=s.espp||""; $("k401r").value=s.k401r||""; $("k401a").value=s.k401a||"";
   $("more").open=!!((+s.credit||0)||(+s.oPre||0)||(+s.oPost||0)||s.step2||(+s.espp||0));
   $("med").value=s.med??MED; $("duesAmt").value=s.duesAmt??DUES; $("mnpl").value=s.mnpl??MNPL; $("ytd").value=s.ytd??"";
@@ -866,10 +881,8 @@ function renderVac(s,c){
   const H=s.holD||[], wk=[0,0], hrsW=[0,0];
   for(let k=0;k<14;k++){
     const w=k<7?0:1, i=k%7, d=c.days[k]||{};
-    let worked=(+s.hours[k]||0)+(+(s.otD||[])[k]||0);
-    if(s.shift3)worked=worked*8/6.5;
-    // Only hours actually worked earn credit: PTO and holiday pay don't.
-    wk[w]+=worked; hrsW[w]+=worked;
+    const ph=paidHrs(s,k);
+    wk[w]+=ph; hrsW[w]+=ph;
   }
   const st0=starts(s); let sick=st0.sickE, toSick=0, toVac=0; const lines=[];
   const perV=[0,0],perS=[0,0];
@@ -886,7 +899,7 @@ function renderVac(s,c){
   const weeksLeft=viz?52:Math.max(0,Math.floor((dayN(ann)-dayN(today))/7)), avg=(wk[0]+wk[1])/2, crW=r1(avg/div);
   let ps=sick, pv=0; for(let n=0;n<weeksLeft;n++){if(ps<40)ps=r1(ps+crW);else pv=r1(pv+crW);}
   const sickFull=st0.sickE>=40;
-  const tot=+(wk[0]+wk[1]).toFixed(1), src=vcal()?`<b>${fmtD(vcal().start)} \u2013 ${fmtD(vcal().end)}</b> \u00b7 ${tot} hrs worked`:`${tot} hrs worked`;
+  const tot=+(wk[0]+wk[1]).toFixed(1), src=vcal()?`<b>${fmtD(vcal().start)} \u2013 ${fmtD(vcal().end)}</b> \u00b7 ${tot} paid hrs`:`${tot} paid hrs`;
   // Plain-language breakdown: which hours are already in the timekeeping numbers, and what gets added.
   const inc=asOfWk1(s), pg=(who==="mel"&&CAL)?fmtD(addD((()=>{const a=s.anch||pageAnch(),[ay,am,ad]=a.split("-").map(Number);return new Date(ay,am-1,ad);})(),-1)):vcal()&&!viz?fmtD(addD(vcal().start,-1)):"", ws=inc?[1]:[0,1];
   const used=(a,w,x)=>r1(wkSum(a,w)*(x||1));
@@ -911,7 +924,7 @@ function renderVac(s,c){
     `<div><span>Vacation ${endLbl}</span><b>${bal===null?"–":bal}</b><small>${bal===null?"add your balance above":endLine(viz?st0.vac:rawV,perV,s.pto,vx)}</small></div><div><span>Sick ${endLbl}</span><b>${sbal===null?"–":sbal}</b><small>${sbal===null?"add your balance above":endLine(viz?st0.sick:rawS,perS,s.sickD,1)}</small></div></div>`+
     rollNote+
     `<div class="hsum"><span>${viz?"A full year at this pace":`By ${fmtD(ann)}, ${ann.getFullYear()} at this pace`}</span><span>+${pv} hrs vacation</span></div>`+
-    `<p class="hint" style="margin-top:8px">You earn 1 hr per ${div} hrs worked (${yrs} yrs seniority). Only hours worked count. Sick fills to 40 a year first, then vacation. Sick restarts ${viz?"on your anniversary":fmtD(ann)}.${viz?(nextT?` 1 per ${vacDivisor(nextT)} at ${nextT} yrs.`:""):(yrs<5?" 1 per 16 at 5 yrs.":"")}</p>`;
+    `<p class="hint" style="margin-top:8px">You earn 1 hr per ${div} paid hrs (${yrs} yrs seniority): hours worked (OT counts as 1), vacation, sick and holiday pay. Sick fills to 40 a year first, then vacation. Sick restarts ${viz?"on your anniversary":fmtD(ann)}.${viz?(nextT?` 1 per ${vacDivisor(nextT)} at ${nextT} yrs.`:""):(yrs<5?" 1 per 16 at 5 yrs.":"")}</p>`;
 }
 function stampHolidays(){if(!CAL)return;DEF.forEach((_,k)=>{if(HOLIDAYS.has(CAL.dates[k]))$("hd"+k).setAttribute("aria-pressed","true");});}
 // Day rules: no regular hours on Sat, Sun or holidays; regular is capped at 8 minus PTO.
@@ -957,7 +970,7 @@ function render(){renderQEnd();
   }
   if(who==="prev"&&PCAL)DEF.forEach((_,k)=>{if(HOLIDAYS.has(PCAL.dates[k]))s.holD[k]=true;});
   if(who==="prev")prevSync();
-  ["q160h","vacBal","sickBal","sickE"].forEach(id=>{const el=$(id),ro=who==="prev";el.readOnly=ro;el.classList.toggle("ro",ro);if(ro)el.value=s[id]??"";});
+  ["q160h","vacBal","sickBal","sickE","consW"].forEach(id=>{const el=$(id),ro=who==="prev";el.readOnly=ro;el.classList.toggle("ro",ro);if(ro)el.value=s[id]??"";});
   const c=calc(s);
   {const qa=$("qAfter"),on=who==="mel"&&!!CAL&&(s.periodId||CAL.id)===CAL.id;qa.hidden=!on;if(on){const wi=weekIdx(),v=+c.qWk[wi].toFixed(1),pe=+c.qEnd.toFixed(1);
     qa.innerHTML=`<span>Quarter OT at end of pay period<small>${pe>=160?"Past 160: extra OT pays 2×":`${+(160-pe).toFixed(1)} hrs to go until 160`}${wi===0?` · after this week: ${v}`:""}${c.qReset?" · new quarter started this period":""}</small></span><b>${pe} hrs</b>`;}}
@@ -986,7 +999,7 @@ function render(){renderQEnd();
   $("earn").innerHTML=
     row("Straight time",`${(c.st).toFixed(1)} hrs worked${(()=>{const v=sum(s.pto||[]),k=sum(s.sickD||[]);return (v?` + ${v} vacation`:"")+(k?` + ${k} sick`:"");})()}${c.leave?` + ${c.leave} leave`:""}${c.holH?` + ${c.holH} holiday`:""} × $${c.r.toFixed(2)}`,money(c.stPay))+
     row("Overtime 1.5×",`${c.ot.toFixed(1)} hrs × $${(c.r*1.5).toFixed(2)}${c.qReset?` · old quarter ${c.q0} → ${+c.qAt.toFixed(1)} hrs, new quarter ${+c.qEnd.toFixed(1)} hrs`:(c.q0||c.qEnd>=160?` · quarter OT ${c.q0} → ${+c.qEnd.toFixed(1)} hrs${c.qEnd>=160?" (past 160: extra OT at 2×)":""}`:"")}`,money(c.otPay))+
-    row("Double time 2×",`${c.dt.toFixed(1)} hrs × $${(c.r*2).toFixed(2)}`,money(c.dtPay))+
+    row("Double time 2×",`${c.dt.toFixed(1)} hrs × $${(c.r*2).toFixed(2)}${c.wkndDbl.some(Boolean)?" · 4th+ weekend in a row: all 2×":""}`,money(c.dtPay))+
     (c.holW?row("Holiday worked 2×",`${c.holW} hrs × $${(c.r*2).toFixed(2)}`,money(c.holPay)):"")+
     `<tr class="tot"><td>Gross pay</td><td class="n">${money(c.gross)}</td></tr>`;
   $("ded").innerHTML=
@@ -1044,6 +1057,7 @@ const INFO={
   mnpl:"Machinists Non-Partisan Political League, the union's voluntary political fund. On your stub it comes out every other check. Put 0 if you don't contribute.",
   ytd:"The year-to-date gross on your most recent stub, before the check you're figuring. Only matters near the yearly limits: Social Security stops at $184,500 and an extra 0.9% Medicare starts over $200,000.",
   dues:"Dues and MNPL come out every other check. From the paystubs checked so far, union dues come out of the first check of the month and MNPL out of the second. A third check in the same month has neither (and no medical either). ⚠ Based on a few stubs, not yet confirmed.",
+  consW:"Copy Consecutive Weekends from the Overtime Summary on your timekeeping page. After 3 weekends in a row, the next weekend you work pays 2× for every hour. It counts forward by itself.",
   q160h:"Copy Current Quarter Hours from the Overtime Summary on your timekeeping page, exactly as it shows. The page updates weekly (as of the end of last week), and the calculator knows which week that is. Below it you'll see your quarter OT after this week. After that you don't need to touch it: when a new pay period starts and you tap Start new period or Keep hours, it adds the last period's overtime by itself (and restarts at 0 when a quarter ends). Once you pass 160, every extra overtime hour that quarter pays 2×, and the calculator switches at the exact hour.",
   hLunch:"Check this if you worked through your lunch and claimed it. Your lunch time is then paid instead of taken out, which adds it as overtime (0.5 hrs for a 30-minute lunch). Leave it unchecked if you took your normal unpaid lunch.",
   senM:"Your seniority date sets your vacation rate. Find it with your leave balances in your timekeeping system. Enter the month, day and 4-digit year, like 1 / 13 / 2023.",
@@ -1187,9 +1201,9 @@ const pageAnch=()=>ymd(addD(pageAsOf(),1));   // the Friday after the page's dat
 // Where the copied numbers start, in weeks from this pay period's first day: -1 = last week of the previous period, 0, or 1.
 function anchOff(s){if(s!==state.mel||!CAL)return 0;const a=s.anch||pageAnch(),pid=s.periodId||CAL.id,[y,m,d]=pid.split("-").map(Number),[ay,am,ad]=a.split("-").map(Number);return Math.round((dayN(new Date(ay,am-1,ad))-dayN(new Date(y,m-1,d)))/7);}
 function asOfWk1(s){return anchOff(s)===1;}
-["q160h","vacBal","sickBal","sickE"].forEach(id=>$(id).addEventListener("input",()=>{if(who!=="mel"||!CAL||(state.mel.periodId||CAL.id)!==CAL.id)return;state.mel.anch=pageAnch();render();}));
+["q160h","vacBal","sickBal","sickE","consW"].forEach(id=>$(id).addEventListener("input",()=>{if(who!=="mel"||!CAL||(state.mel.periodId||CAL.id)!==CAL.id)return;state.mel.anch=pageAnch();render();}));
 function wkOT(s,w){let t=0;for(const i of ORDER){const k=w*7+i,d=dayPay(i,(+s.hours[k]||0)+(+(s.otD||[])[k]||0),ptoAt(s,k),(s.holD||[])[k]);t+=d.ot+d.dt+d.holW;}return r1(t);}
-function wkWorked(s,w){let t=0;for(let k=w*7;k<w*7+7;k++)t+=(+s.hours[k]||0)+(+(s.otD||[])[k]||0);return s.shift3?t*8/6.5:t;}
+function wkWorked(s,w){let t=0;for(let k=w*7;k<w*7+7;k++)t+=paidHrs(s,k);return t;}
 function wkSum(a,w){let t=0;for(let k=w*7;k<w*7+7;k++)t+=+(a||[])[k]||0;return t;}
 function starts(s){
   const blank=v=>v===""||v==null;
@@ -1278,7 +1292,7 @@ function histFigures(pr,os){
   if(sd){const div=vacDivisor(yrsBetween(sd,addD(os,13)));let aOff=null;
     for(const Y of [os.getFullYear(),os.getFullYear()+1]){const o=dayN(new Date(Y,sd.getMonth(),sd.getDate()))-dayN(os);if(o>=0&&o<=13&&aOff===null)aOff=o;}
     let reset=false;for(const w of [0,1]){if(aOff!==null&&!reset&&aOff<=7*w){sickE=0;reset=true;}
-      let wh=0;for(let k=w*7;k<w*7+7;k++)wh+=(+pr.hours[k]||0)+(+(pr.otD||[])[k]||0);if(pr.shift3)wh=wh*8/6.5;
+      const wh=wkWorked(pr,w);
       const cr=r1(wh/div);if(sickE<40){sickE=r1(sickE+cr);toS=r1(toS+cr);}else toV=r1(toV+cr);}
     if(aOff!==null&&!reset)sickE=0;}
   e.sickEEnd=sickE; e.vacEarned=sd?toV:null; e.sickEarned=sd?toS:null;
@@ -1293,11 +1307,11 @@ function addEnds(){const s=state.mel,h=(s.hist||[])[0];if(!h||h.p)return;if(h.qE
 function legacyInit(i,vals,noSave){
   const s=state.mel,h=s.hist[i],[y,m,d]=h.pid.split("-").map(Number),os=new Date(y,m-1,d);
   const pr=JSON.parse(JSON.stringify(s)); ["hist","myPresets","holStash","qRoll","lRoll","anch"].forEach(k=>delete pr[k]);
-  Object.assign(pr,vals); if(!vals.holD)pr.holD=Array(14).fill(false); pr.q160h="0"; pr.vacBal="0"; pr.sickBal="0";
+  Object.assign(pr,vals); if(!vals.holD)pr.holD=Array(14).fill(false); pr.consW="0"; pr.q160h="0"; pr.vacBal="0"; pr.sickBal="0";
   // Sick earned this year at the start: the value that lands on today's number after this period's weeks.
   const endE=Math.max(0,(i===0&&CAL&&h.pid===ymd(addD(CAL.start,-14)))?starts(s).sickE:num(s.sickE,0)), sd=parseDateMDY(s.senDate);
   pr.sickE=String(endE);
-  if(sd){const div=vacDivisor(yrsBetween(sd,addD(os,13))),wk=w=>{let t=0;for(let k=w*7;k<w*7+7;k++)t+=(+vals.hours[k]||0)+(+vals.otD[k]||0);return r1((pr.shift3?t*8/6.5:t)/div);};
+  if(sd){const div=vacDivisor(yrsBetween(sd,addD(os,13))),wk=w=>r1(wkWorked(Object.assign({},pr,vals),w)/div);
     for(const x of [r1(endE-wk(0)),r1(endE-wk(0)-wk(1)),endE]){if(x<0)continue;pr.sickE=String(x);if(Math.abs(histFigures(pr,os).sickEEnd-endE)<0.05)break;pr.sickE=String(endE);}}
   const z=histFigures(pr,os);
   pr.q160h=String(Math.max(0,r1((h.qEnd||0)-z.qEnd)));
@@ -1425,8 +1439,7 @@ function rollLeave(){
     let aOff=null; for(const Y of [os.getFullYear(),os.getFullYear()+1]){const o=dayN(new Date(Y,sd.getMonth(),sd.getDate()))-osN;if(o>=0&&o<gapN&&aOff===null)aOff=o;}
     for(const w of [0,1]){
       if(aOff!==null&&!reset&&aOff<=7*w){sickE=0;reset=true;}
-      let wh=0; for(let k=w*7;k<w*7+7;k++)wh+=(+s.hours[k]||0)+(+(s.otD||[])[k]||0);
-      if(s.shift3)wh=wh*8/6.5;
+      const wh=wkWorked(s,w);
       const cr=r1(wh/div); if(sickE<40){sickE=r1(sickE+cr);toS=r1(toS+cr);}else toV=r1(toV+cr);
     }
     if(aOff!==null&&!reset){sickE=0;reset=true;}
@@ -1445,6 +1458,7 @@ function rollQuarter(){
   const [y,m,d]=s.periodId.split("-").map(Number), os=new Date(y,m-1,d), osN=dayN(os);
   const qN=QENDS.map(q=>{const [a,b,c]=q.split("-").map(Number);return dayN(new Date(a,b-1,c));});
   let qOff=null; qN.forEach(n=>{const o=n-osN;if(o>=0&&o<=13)qOff=o;});
+  {const cc=calc(s,calFor(new Date(y,m-1,d)));s.consW=String(cc.consEnd);$("consW").value=s.consW;}
   let q=starts(s).q, add=0, reset=false;
   for(const w of [0,7]) for(const i of ORDER){
     const k=w+i, off=w+ORDER.indexOf(i);
@@ -1511,9 +1525,11 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=30;
+const NOTES_VERSION=31;
 const NOTES=[
-  "Union holidays are now marked automatically through September 2028, including Thanksgiving and winter break 2027"
+  "PTO is now earned on every paid hour: hours worked (OT counts as 1), vacation, sick and holiday pay. Re-copy your vacation and sick numbers from your timekeeping page on Tuesday",
+  "New Consecutive Weekends box: after 3 weekends in a row, the next weekend you work pays 2x for every hour. Copy it once from your timekeeping page",
+  "3rd shift: weekday overtime is 1.5x for the first 1.5 hours and Saturday for the first 6.5 hours, then 2x"
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

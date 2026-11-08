@@ -981,7 +981,8 @@ function render(){renderQEnd();
   renderVac(s,c);
   const sum=a=>Math.round(a.reduce((x,y)=>x+(+y||0),0)*10+1e-9)/10;
   const wkT=(a,b)=>{const h=sum(s.hours.slice(a,b)),o=sum((s.otD||[]).slice(a,b)),p=sum((s.pto||[]).slice(a,b)),sk=sum((s.sickD||[]).slice(a,b));return `${h} Regular · ${o} OT · ${p} Vacation · ${sk} Sick`;};
-  $("setupSum").textContent=(+s.rate>0)?`Your setup · $${(+s.rate).toFixed(2)}/hr · 401(k) ${+((+s.k401||0)+(+s.k401r||0)+(+s.k401a||0)).toFixed(2)}% · ${FSN[s.fs]||FSN.mfj}`:"Your setup · start here";
+  $("setup").classList.toggle("ro",who==="prev");$("setup").querySelectorAll("input,select,button").forEach(e=>{if(who==="prev"){if(!e.dataset.roWas){e.dataset.roWas=e.disabled?"1":"0";}e.disabled=true;}else if(e.dataset.roWas){e.disabled=e.dataset.roWas==="1";delete e.dataset.roWas;}});
+  $("setupSum").textContent=(who==="prev"?"Using your Current setup · ":"")+((+s.rate>0)?`Your setup · $${(+s.rate).toFixed(2)}/hr · 401(k) ${+((+s.k401||0)+(+s.k401r||0)+(+s.k401a||0)).toFixed(2)}% · ${FSN[s.fs]||FSN.mfj}`:"Your setup · start here")+(s.shift3?" · 3rd shift":"");
   const noRate=!(+s.rate>0);
   $("sNet").textContent=noRate?"Add your rate":money(c.net); $("sGross").textContent=noRate?"—":money(c.gross);
   $("wk1t").textContent=wkT(0,7);
@@ -1246,7 +1247,9 @@ function renderSeg(){
   $("reset").hidden=who==="prev";
 }
 // Edits made in the pending view: recalc that check and carry the change forward to today's numbers.
-function prevSync(){const H=state.mel.hist||[],i=H.findIndex(x=>x.pid===PPID);if(i<0)return;saveHistEdit(i,{},true);}
+// The pending check always uses your Current setup (rate, 401(k), W-4, 3rd shift…), so a change there shows up here too.
+const PAY_KEYS=["shift3","rate","k401","k401r","k401a","extra","loan","fs","med","duesAmt","mnpl","ytd","credit","oPre","oPost","espp","step2","senDate"];
+function prevSync(){const H=state.mel.hist||[],i=H.findIndex(x=>x.pid===PPID);if(i<0)return;const P=H[i].p;if(P)PAY_KEYS.forEach(k=>{P[k]=state.mel[k];});saveHistEdit(i,{},true);}
 $("segPrev").onclick=()=>{if(who==="prev")return;const pi=pendingInfo();if(!pi)return;read();
   const s=state.mel;if(!(s.hist||[]).some(h=>h.pid===pi.pid)){const n=addPastEntry(pi.pid,{hours:Array(14).fill(0),otD:Array(14).fill(0),pto:Array(14).fill(0),sickD:Array(14).fill(0),holD:Array(14).fill(false)},true);n.fill=true;}
   const h=s.hist.find(x=>x.pid===pi.pid); if(!h.p){const i=s.hist.indexOf(h);legacyInit(i,{hours:Array(14).fill(0),otD:Array(14).fill(0),pto:Array(14).fill(0),sickD:Array(14).fill(0),holD:Array(14).fill(false)});s.hist[i].fill=true;}
@@ -1525,10 +1528,10 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=32;
+const NOTES_VERSION=33;
 const NOTES=[
-  "Your timekeeping page updates over the weekend, not Tuesday. From Saturday on, copy the new numbers exactly as shown",
-  "PTO is now earned on every paid hour, and there's a Consecutive Weekends box: after 3 weekends in a row, the next weekend pays 2x"
+  "The Pending check now always uses your Current setup (rate, 401(k), W-4, 3rd shift), so both checks match",
+  "Your setup line shows 3rd shift when that box is checked"
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

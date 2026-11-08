@@ -911,8 +911,8 @@ function renderVac(s,c){
   let nowBox="";
   if(who==="mel"&&VC&&!viz&&(s.periodId||CAL.id)===CAL.id&&(st0.vac!==null||st0.sick!==null)){
     // "Now" works like the timekeeping page: hours used come off the day they're used; earned hours only show up
-    // once the page posts them, on the Tuesday after each week ends.
-    const tN=dayN(new Date()),posted=endDate=>dayN(endDate)+5<=tN,done=w=>posted(addD(VC.start,7*w+6)),usedTo=a=>{let t=0;for(let k=0;k<14;k++){const [y,m,d]=VC.dates[k].split("-").map(Number);if(dayN(new Date(y,m-1,d))<=tN)t+=+(a||[])[k]||0;}return t;};
+    // once the page posts them, on the Saturday after each week ends.
+    const tN=dayN(new Date()),posted=endDate=>dayN(endDate)+2<=tN,done=w=>posted(addD(VC.start,7*w+6)),usedTo=a=>{let t=0;for(let k=0;k<14;k++){const [y,m,d]=VC.dates[k].split("-").map(Number);if(dayN(new Date(y,m-1,d))<=tN)t+=+(a||[])[k]||0;}return t;};
     // The start-of-period numbers include last period's final week. If that week isn't posted yet, take its credit back out.
     let unV=0,unS=0;
     if(!posted(addD(VC.start,-1))){const ph=(s.hist||[]).find(x=>x.pid===ymd(addD(VC.start,-14))),sd=parseDateMDY(s.senDate);
@@ -1195,8 +1195,8 @@ const vacX=s=>s.shift3?8/6.5:1;   // 3rd shift: a 6.5-hr vacation day takes 8 fr
 // s.anch = the Friday that starts the week those numbers were copied in (they cover everything before it).
 // If that's week 2 of the pay period, week 1 is already in them, so it's backed out here.
 function weekIdx(){if(!CAL)return 0;return dayN(new Date())-dayN(CAL.start)>=7?1:0;}
-// The timekeeping page updates on Tuesday: Tue–Thu it's "as of" last Thursday; Fri–Mon it's still "as of" the Thursday before that.
-function pageAsOf(t){t=t||new Date();const dow=t.getDay();let back=(dow-4+7)%7;if(back===0)back=7;if(back<=4)back+=7;return addD(new Date(t.getFullYear(),t.getMonth(),t.getDate()),-back);}
+// The timekeeping page updates over the weekend: Sat–Thu it's "as of" last Thursday; on Friday it's still "as of" the Thursday before that.
+function pageAsOf(t){t=t||new Date();const dow=t.getDay();let back=(dow-4+7)%7;if(back===0)back=7;if(back===1)back+=7;return addD(new Date(t.getFullYear(),t.getMonth(),t.getDate()),-back);}
 const pageAnch=()=>ymd(addD(pageAsOf(),1));   // the Friday after the page's date: numbers cover everything before it
 // Where the copied numbers start, in weeks from this pay period's first day: -1 = last week of the previous period, 0, or 1.
 function anchOff(s){if(s!==state.mel||!CAL)return 0;const a=s.anch||pageAnch(),pid=s.periodId||CAL.id,[y,m,d]=pid.split("-").map(Number),[ay,am,ad]=a.split("-").map(Number);return Math.round((dayN(new Date(ay,am-1,ad))-dayN(new Date(y,m-1,d)))/7);}
@@ -1261,7 +1261,7 @@ function renderAsOfHint(){
   const dt=`<b>as of ${fmtD(d)}</b>`;
   // First Fri–Mon of a pay period: the page is missing last period's final week. Say so if History can't fill it in.
   const ws=addD(d,1), gapEnd=addD(CAL.start,-1), gap=dayN(ws)<dayN(CAL.start), ph=(state.mel.hist||[]).find(x=>x.pid===ymd(addD(CAL.start,-14)));
-  const warn=gap&&!(ph&&ph.p)?` <span class="warnline">It doesn't have ${fmtD(ws)} – ${fmtD(gapEnd)} yet: add those hours under Pending check, or copy your numbers on Tuesday.</span>`:"";
+  const warn=gap&&!(ph&&ph.p)?` <span class="warnline">It doesn't have ${fmtD(ws)} – ${fmtD(gapEnd)} yet: add those hours under Pending check, or copy your numbers on Saturday.</span>`:"";
   $("asOfQ").innerHTML=`From your timekeeping page, ${dt}.${warn}`;
   $("asOfV").innerHTML=`From your timekeeping page, ${dt}.${warn}`;
 }
@@ -1525,11 +1525,10 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=31;
+const NOTES_VERSION=32;
 const NOTES=[
-  "PTO is now earned on every paid hour: hours worked (OT counts as 1), vacation, sick and holiday pay. Re-copy your vacation and sick numbers from your timekeeping page on Tuesday",
-  "New Consecutive Weekends box: after 3 weekends in a row, the next weekend you work pays 2x for every hour. Copy it once from your timekeeping page",
-  "3rd shift: weekday overtime is 1.5x for the first 1.5 hours and Saturday for the first 6.5 hours, then 2x"
+  "Your timekeeping page updates over the weekend, not Tuesday. From Saturday on, copy the new numbers exactly as shown",
+  "PTO is now earned on every paid hour, and there's a Consecutive Weekends box: after 3 weekends in a row, the next weekend pays 2x"
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

@@ -579,7 +579,7 @@ const RATES=[.10,.12,.22,.24,.32,.35,.37];
 const FSN={mfj:"Married jointly",single:"Single",hoh:"Head of household"};
 // Union pay calendar, Sep 2026 – Aug 2027 (update when the next calendar is published)
 const PAYDATES=["2026-09-03","2026-09-17","2026-10-01","2026-10-15","2026-10-29","2026-11-12","2026-11-25","2026-12-10","2026-12-24","2027-01-07","2027-01-21","2027-02-04","2027-02-18","2027-03-04","2027-03-18","2027-04-01","2027-04-15","2027-04-29","2027-05-13","2027-05-27","2027-06-10","2027-06-24","2027-07-08","2027-07-22","2027-08-05","2027-08-19"];
-const HOLIDAYS=new Set(["2026-09-07","2026-11-26","2026-11-27","2026-12-24","2026-12-25","2026-12-28","2026-12-29","2026-12-30","2026-12-31","2027-01-01","2027-05-31","2027-07-05"]);
+const HOLIDAYS=new Set(["2026-09-07","2026-11-26","2026-11-27","2026-12-24","2026-12-25","2026-12-28","2026-12-29","2026-12-30","2026-12-31","2027-01-01","2027-05-31","2027-07-05","2027-09-06","2027-11-25","2027-11-26","2027-12-24","2027-12-27","2027-12-28","2027-12-29","2027-12-30","2027-12-31","2028-01-03","2028-05-29","2028-07-04","2028-09-04"]);
 const QENDS=["2026-09-24","2026-12-17","2027-03-25","2027-06-24"];
 function renderQEnd(){const el=$("qEndNote"),t=new Date(),tn=dayN(t);let nx=null;
   for(const q of QENDS){const [y,m,d]=q.split("-").map(Number),dt=new Date(y,m-1,d);if(dayN(dt)>=tn){nx=dt;break;}}
@@ -769,7 +769,7 @@ function renderCal(s){
   const dLeft=dayN(nextPay)-dayN(new Date());
   $("subLine").textContent=dLeft<=0?`Payday today · ${fmtD(nextPay)}`:dLeft===1?`Payday tomorrow · ${fmtD(nextPay)}`:`Payday in ${dLeft} days · ${fmtD(nextPay)}`;
   $("period").innerHTML=`Pay period <b>${fmtD(C.start)} – ${fmtD(C.end)}</b> · paid <b>${fmtD(C.pay)}</b>${C.est?" (estimated)":""}`+
-    `<small>${ord} check in ${C.month}${C.qEndD?` · <span class="q">Budget quarter ends ${fmtD(C.qEndD)}: overtime after that starts the new quarter at 0</span>`:""}${C.pastCard?" · Past the union card: holidays aren't marked automatically":""}</small>`;
+    `<small>${ord} check in ${C.month}${C.qEndD?` · <span class="q">Budget quarter ends ${fmtD(C.qEndD)}: overtime after that starts the new quarter at 0</span>`:""}${C.pastCard?" · Past the union pay calendar: payday is estimated":""}</small>`;
   $("duesAuto").textContent=(C.rank===1?`${fmtD(C.pay)} is the 1st check in ${C.month}: union dues come out, MNPL doesn't.`:C.rank===2?`${fmtD(C.pay)} is the 2nd check in ${C.month}: MNPL comes out, union dues don't.`:`${fmtD(C.pay)} is the ${ord} check in ${C.month}: no union dues, MNPL or medical.`)+" ⚠ Based on a few stubs, not yet confirmed.";
   if(who==="mel"&&s.periodId!==CAL.id){
     const [y,m,d]=s.periodId.split("-").map(Number), os=new Date(y,m-1,d);
@@ -1511,9 +1511,9 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=29;
+const NOTES_VERSION=30;
 const NOTES=[
-  "Vacation now and Sick now work like the timekeeping page: hours you use come off that day, and hours you earn show up on the Tuesday after each week"
+  "Union holidays are now marked automatically through September 2028, including Thanksgiving and winter break 2027"
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

@@ -207,6 +207,8 @@ tr.tot td{border-bottom:0;border-top:2px solid var(--ink);font-weight:700;paddin
 .hres .hbig small{display:block;font:500 11.5px var(--f-num);color:var(--muted);margin-top:2px}
 .hres .hsum{display:flex;justify-content:space-between;gap:10px;border-top:2px solid var(--ink);padding-top:8px;font-weight:700}
 .hres .hsum span:last-child{font-family:var(--f-num)}
+.hres .hyr small{display:block;font-weight:400;font-size:.8em;opacity:.75}
+.hres .hyr{margin-top:10px}
 .hres{margin:14px 0}
 .hres .hbig{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px}
 .hres .hbig div{border:1.5px solid var(--ink);border-radius:3px;padding:8px 10px;background:var(--bg)}
@@ -870,6 +872,42 @@ function parseDateMDY(v){const m=String(v||"").trim().match(/^(\d{1,2})[\/\-.](\
 function yrsBetween(a,b){let y=b.getFullYear()-a.getFullYear();if(b.getMonth()<a.getMonth()||(b.getMonth()===a.getMonth()&&b.getDate()<a.getDate()))y--;return y;}
 function vacDivisor(y){return y<5?17:y<10?16:y<15?13:y<20?12:y<25?11:10;}
 const r1=x=>Math.round(x*10+1e-9)/10;
+// ---- State sick leave (contract 8.4(a): more sick leave "may be earned in accordance with applicable law") ----
+// State minimum: 1 hr sick per 40 hrs actually worked (OT counts; vacation, sick, holiday pay and call-offs don't),
+// counted from your anniversary. The contract's 40 counts toward it, so sick grows again once hours worked ÷ 40 passes it.
+const lawSick=h=>Math.floor(h/40*10+1e-9)/10;
+const kOff=k=>(k<7?0:7)+ORDER.indexOf(k%7);
+const dayReal=(s,k)=>(+(s.hours||[])[k]||0)+(+(s.otD||[])[k]||0);
+function wkReal(s,w){let t=0;for(let k=w*7;k<w*7+7;k++)t+=dayReal(s,k);return t;}
+function lastAnn(sd,X){let a=new Date(X.getFullYear(),sd.getMonth(),sd.getDate());if(dayN(a)>dayN(X))a=new Date(X.getFullYear()-1,sd.getMonth(),sd.getDate());return a;}
+function workedMap(){const s=state.mel,M=new Map(),put=(pid,p)=>{const [y,m,d]=pid.split("-").map(Number),o=dayN(new Date(y,m-1,d));for(let k=0;k<14;k++)M.set(o+kOff(k),dayReal(p,k));};
+  // A pending check opened but not filled in yet (all zeros) isn't data, so it's skipped.
+  (s.hist||[]).forEach(h=>{if(!h.p||!h.pid)return;if(h.fill&&![...Array(14).keys()].some(k=>dayReal(h.p,k)>0))return;put(h.pid,h.p);});
+  if(s.periodId)put(s.periodId,s);
+  return M;}
+// Hours worked from your last anniversary up to (not including) day X. Days the app has no hours for are
+// estimated from your average, so it's exact only once the app has every day since your anniversary.
+const nDate=n=>{const u=new Date(n*864e5);return new Date(u.getUTCFullYear(),u.getUTCMonth(),u.getUTCDate());};
+function yrWorked(X){const s=state.mel,sd=parseDateMDY(s.senDate);if(!sd||!X)return null;
+  const M=workedMap(),a=lastAnn(sd,X),aN=dayN(a),xN=dayN(X),tN=dayN(new Date());
+  let cov=0,covN=0;M.forEach((v,n)=>{if(n<tN&&n>=tN-365){cov+=v;covN++;}});
+  let allN=0,all=0;M.forEach(v=>{all+=v;allN++;});
+  const avg=covN?cov/covN:(allN?all/allN:0), known=String(s.sickE??"").trim()!=="";
+  // The day the typed numbers describe: the timekeeping page date, or the pay period start after skipped periods.
+  const pS=(()=>{if(!s.periodId)return tN;const [y,m,d]=s.periodId.split("-").map(Number);return dayN(new Date(y,m-1,d));})();
+  const off=anchOff(s), AN=!known?tN:(s.anch&&off>=-1&&off<=1)?(()=>{const [y,m,d]=s.anch.split("-").map(Number);return dayN(new Date(y,m-1,d));})():pS;
+  // Before that day, missing days are estimated from your average. After it, the app only counts hours it has
+  // (same as vacation and sick: skipped pay periods add nothing until you copy your numbers again).
+  const part=(from,to)=>{let sum=0,miss=0;for(let n=from;n<to;n++){if(M.has(n))sum+=M.get(n);else if(n<AN)miss++;}return {sum,miss};};
+  const x=part(aN,xN); let est=x.miss*avg;
+  // The page's "sick earned" caps the guess: worked more than earned × 40 and the page would show more.
+  if(x.miss&&known&&dayN(lastAnn(sd,nDate(AN-1)))===aN){const raw=Math.max(0,+s.sickE||0),pa=part(aN,AN),room=Math.max(0,raw*40-pa.sum),over=Math.max(0,pa.miss*avg-room);est=Math.max(0,est-over);}
+  return {hrs:r1(x.sum+est),exact:(()=>{for(let n=aN;n<Math.min(xN,tN);n++)if(!M.has(n))return false;return true;})(),trust:x.miss===0||known,ann:a,next:new Date(a.getFullYear()+1,a.getMonth(),a.getDate()),avgWk:avg*7};}
+// One week's credit: the contract first (sick fills to 40, the rest is vacation), then the state minimum on top.
+// The contract always fills 40 faster than 1 per 40, so the state rule only matters once those 40 are in.
+function wkSplit(sickE,cr,yEnd){let toS=0,toV=0;if(sickE<40){sickE=r1(sickE+cr);toS=cr;}else toV=cr;
+  if(yEnd!=null&&sickE>=40){const L=lawSick(yEnd);if(L>sickE){toS=r1(toS+L-sickE);sickE=L;}}return {sickE,toS,toV};}
+const yEndAt=d=>{const y=yrWorked(d);return y&&y.trust?y.hrs:null;};
 function renderVac(s,c){
   const el=$("vRes"), sd=parseDateMDY(s.senDate), raw=(s.senDate||"").trim();
   $("senR").classList.toggle("bad",!!raw&&!sd); $("senR").textContent=raw?(sd?fmtD(sd)+", "+sd.getFullYear():"Check the month, day and 4-digit year"):"";
@@ -886,7 +924,9 @@ function renderVac(s,c){
   }
   const st0=starts(s); let sick=st0.sickE, toSick=0, toVac=0; const lines=[];
   const perV=[0,0],perS=[0,0];
-  wk.forEach((h,w)=>{const cr=r1(h/div); if(sick<40){sick=r1(sick+cr);toSick=r1(toSick+cr);perS[w]=cr;lines.push(`Week ${w+1}: ${+h.toFixed(1)} hrs → +${cr} sick`);}else{toVac=r1(toVac+cr);perV[w]=cr;lines.push(`Week ${w+1}: ${+h.toFixed(1)} hrs → +${cr} vacation`);}});
+  const P0=(!viz&&vcal())?vcal().start:null;
+  wk.forEach((h,w)=>{const cr=r1(h/div),r=wkSplit(sick,cr,P0?yEndAt(addD(P0,7*w+7)):null);sick=r.sickE;toSick=r1(toSick+r.toS);toVac=r1(toVac+r.toV);perS[w]=r.toS;perV[w]=r.toV;});
+  const lawOn=sick>=40&&toSick>0;
   const ptoUsed=r1((s.pto||[]).reduce((a,v)=>a+(+v||0),0)*vacX(s)), sickUsed=r1((s.sickD||[]).reduce((a,v)=>a+(+v||0),0));
   const bal=st0.vac!==null?r1(st0.vac+toVac-ptoUsed):null;
   const wi=(!viz&&CAL&&(s.periodId||CAL.id)===CAL.id)?weekIdx():1, vx=vacX(s);
@@ -908,7 +948,10 @@ function renderVac(s,c){
   const rawV=inc?num(s.vacBal,0):st0.vac, rawS=inc?num(s.sickBal,0):st0.sick;
   const mdy=x=>x.toLocaleDateString("en-US",{month:"short",day:"numeric"}), rng=(a,b)=>a.getMonth()===b.getMonth()?`${mdy(a)} – ${b.getDate()}`:`${mdy(a)} – ${mdy(b)}`, VC=vcal();
   const addV=inc?perV[1]:toVac, addS=inc?perS[1]:toSick, sub=viz||!VC?"hrs":inc?rng(addD(VC.start,7),VC.end):rng(VC.start,VC.end), endLbl=viz||!VC?"at end of pay period":`by ${mdy(VC.end)}`;
-  let nowBox="";
+  let nowBox="", yrBox="";
+  if(!viz){const yw=yrWorked(new Date());if(yw){const thr=Math.max(1600,Math.ceil(Math.max(40,st0.sickE)*40/10)*10),left=Math.max(0,thr-yw.hrs),eta=left>0&&yw.avgWk>0?addD(new Date(),Math.ceil(left/yw.avgWk*7)):null,n=v=>Math.round(v).toLocaleString("en-US");
+    yrBox=`<div class="hsum hyr"><span>Hours worked since ${mdy(yw.ann)}<small>${yw.exact?"exact":`estimate until ${mdy(yw.next)}, ${yw.next.getFullYear()}`}</small></span><span>${yw.exact?"":"≈"}${n(yw.hrs)}</span></div>`+
+      `<p class="hint">${!yw.trust?"Add your sick earned above to check this.":lawOn||left===0?`Past ${n(thr)} hrs: sick grows 1 hr per 40 hrs worked, on top of vacation.`:`Sick grows again at ${n(thr)} hrs${eta?` · about ${mdy(eta)}`:""}.`}</p>`;}}
   if(who==="mel"&&VC&&!viz&&(s.periodId||CAL.id)===CAL.id&&(st0.vac!==null||st0.sick!==null)){
     // "Now" works like the timekeeping page: hours used come off the day they're used; earned hours only show up
     // once the page posts them, on the Saturday after each week ends.
@@ -916,15 +959,15 @@ function renderVac(s,c){
     // The start-of-period numbers include last period's final week. If that week isn't posted yet, take its credit back out.
     let unV=0,unS=0;
     if(!posted(addD(VC.start,-1))){const ph=(s.hist||[]).find(x=>x.pid===ymd(addD(VC.start,-14))),sd=parseDateMDY(s.senDate);
-      if(ph&&ph.p&&sd){const div=vacDivisor(yrsBetween(sd,addD(VC.start,-1)));let se=Math.max(0,num(ph.p.sickE,0));[0,1].forEach(w=>{const cr=r1(wkWorked(ph.p,w)/div);if(se<40){se=r1(se+cr);if(w===1)unS=cr;}else if(w===1)unV=cr;});}}
+      if(ph&&ph.p&&sd){const div=vacDivisor(yrsBetween(sd,addD(VC.start,-1)));let se=Math.max(0,num(ph.p.sickE,0));[0,1].forEach(w=>{const cr=r1(wkWorked(ph.p,w)/div),r=wkSplit(se,cr,yEndAt(addD(VC.start,-7+7*w)));se=r.sickE;if(w===1){unS=r.toS;unV=r.toV;}});}}
     const vNow=st0.vac===null?null:r1(st0.vac-unV+[0,1].reduce((t,w)=>t+(done(w)?perV[w]:0),0)-usedTo(s.pto)*vx);
     const sNow=st0.sick===null?null:r1(st0.sick-unS+[0,1].reduce((t,w)=>t+(done(w)?perS[w]:0),0)-usedTo(s.sickD));
     nowBox=`<div class="hbig hnow"><div><span>Vacation now</span><b>${vNow===null?"–":vNow}</b><small>today, ${mdy(new Date())}</small></div><div><span>Sick now</span><b>${sNow===null?"–":sNow}</b><small>today, ${mdy(new Date())}</small></div></div>`;}
-  el.innerHTML=`<p class="vsrc">${src}</p>${nowBox}<div class="hbig"><div class="otw"><span>Vacation earned</span><b>${addV}</b><small>${sub}</small></div><div class="pto"><span>Sick leave earned</span><b>${addS}</b><small>${sick>=40?"full for the year":`${r1(sick)} of 40 this year`}</small></div>`+
+  el.innerHTML=`<p class="vsrc">${src}</p>${nowBox}<div class="hbig"><div class="otw"><span>Vacation earned</span><b>${addV}</b><small>${sub}</small></div><div class="pto"><span>Sick leave earned</span><b>${addS}</b><small>${lawOn?"1 per 40 hrs worked":sick>=40?"40 done this year":`${r1(sick)} of 40 this year`}</small></div>`+
     `<div><span>Vacation ${endLbl}</span><b>${bal===null?"–":bal}</b><small>${bal===null?"add your balance above":endLine(viz?st0.vac:rawV,perV,s.pto,vx)}</small></div><div><span>Sick ${endLbl}</span><b>${sbal===null?"–":sbal}</b><small>${sbal===null?"add your balance above":endLine(viz?st0.sick:rawS,perS,s.sickD,1)}</small></div></div>`+
-    rollNote+
+    rollNote+yrBox+
     `<div class="hsum"><span>${viz?"A full year at this pace":`By ${fmtD(ann)}, ${ann.getFullYear()} at this pace`}</span><span>+${pv} hrs vacation</span></div>`+
-    `<p class="hint" style="margin-top:8px">You earn 1 hr per ${div} paid hrs (${yrs} yrs seniority): hours worked (OT counts as 1), vacation, sick and holiday pay. Sick fills to 40 a year first, then vacation. Sick restarts ${viz?"on your anniversary":fmtD(ann)}.${viz?(nextT?` 1 per ${vacDivisor(nextT)} at ${nextT} yrs.`:""):(yrs<5?" 1 per 16 at 5 yrs.":"")}</p>`;
+    `<p class="hint" style="margin-top:8px">You earn 1 hr per ${div} paid hrs (${yrs} yrs seniority): hours worked (OT counts as 1), vacation, sick and holiday pay. Sick fills to 40 a year first, then vacation. State law adds 1 sick per 40 hrs worked after that. Sick restarts ${viz?"on your anniversary":fmtD(ann)}.${viz?(nextT?` 1 per ${vacDivisor(nextT)} at ${nextT} yrs.`:""):(yrs<5?" 1 per 16 at 5 yrs.":"")}</p>`;
 }
 function stampHolidays(){if(!CAL)return;DEF.forEach((_,k)=>{if(HOLIDAYS.has(CAL.dates[k]))$("hd"+k).setAttribute("aria-pressed","true");});}
 // Day rules: no regular hours on Sat, Sun or holidays; regular is capped at 8 minus PTO.
@@ -1216,7 +1259,7 @@ function starts(s){
     const P=h.p,o={...raw},wkStart=addD(ps,7),qEndIn=QENDS.some(q=>{const [a,b,c]=q.split("-").map(Number),x=dayN(new Date(a,b-1,c));return x>=dayN(wkStart)&&x<dayN(new Date(y,m-1,d));});
     o.q=qEndIn?0:r1(raw.q+wkOT(P,1));
     const sd=parseDateMDY(s.senDate); let cS=0,cV=0;
-    if(sd){const cr=r1(wkWorked(P,1)/vacDivisor(yrsBetween(sd,addD(ps,13))));if(raw.sickE<40){cS=cr;o.sickE=r1(raw.sickE+cr);}else cV=cr;}
+    if(sd){const cr=r1(wkWorked(P,1)/vacDivisor(yrsBetween(sd,addD(ps,13)))),r=wkSplit(raw.sickE,cr,yEndAt(addD(ps,14)));cS=r.toS;cV=r.toV;o.sickE=r.sickE;}
     if(o.vac!==null)o.vac=r1(raw.vac+cV-wkSum(P.pto,1)*vacX(P));
     if(o.sick!==null)o.sick=r1(raw.sick+cS-wkSum(P.sickD,1));
     return o;
@@ -1225,7 +1268,10 @@ function starts(s){
   const o={...raw}; o.q=Math.max(0,r1(raw.q-wkOT(s,0)));
   let cS=0,cV=0; const sd=parseDateMDY(s.senDate);
   if(sd){const [y,m,d]=(s.periodId||CAL.id).split("-").map(Number),cr=r1(wkWorked(s,0)/vacDivisor(yrsBetween(sd,new Date(y,m-1,d))));
-    if(raw.sickE-cr<40){cS=cr;o.sickE=Math.max(0,r1(raw.sickE-cr));}else cV=cr;}
+    if(raw.sickE<40){cS=cr;o.sickE=Math.max(0,r1(raw.sickE-cr));}else{cV=cr;
+      // State minimum: if hours worked set this number, week 1's share of it comes back out too.
+      const y1=yEndAt(addD(new Date(y,m-1,d),7));if(y1!=null){const L1=lawSick(y1),L0=lawSick(Math.max(0,y1-wkReal(s,0)));
+        if(L1>=raw.sickE-0.05){const x=Math.max(0,r1(raw.sickE-Math.max(L0,40)));cS=x;o.sickE=r1(raw.sickE-x);}}}}
   if(o.vac!==null)o.vac=r1(raw.vac-cV+wkSum(s.pto,0)*vacX(s));
   if(o.sick!==null)o.sick=r1(raw.sick-cS+wkSum(s.sickD,0));
   return o;
@@ -1296,7 +1342,7 @@ function histFigures(pr,os){
     for(const Y of [os.getFullYear(),os.getFullYear()+1]){const o=dayN(new Date(Y,sd.getMonth(),sd.getDate()))-dayN(os);if(o>=0&&o<=13&&aOff===null)aOff=o;}
     let reset=false;for(const w of [0,1]){if(aOff!==null&&!reset&&aOff<=7*w){sickE=0;reset=true;}
       const wh=wkWorked(pr,w);
-      const cr=r1(wh/div);if(sickE<40){sickE=r1(sickE+cr);toS=r1(toS+cr);}else toV=r1(toV+cr);}
+      const cr=r1(wh/div),r=wkSplit(sickE,cr,yEndAt(addD(os,7*w+7)));sickE=r.sickE;toS=r1(toS+r.toS);toV=r1(toV+r.toV);}
     if(aOff!==null&&!reset)sickE=0;}
   e.sickEEnd=sickE; e.vacEarned=sd?toV:null; e.sickEarned=sd?toS:null;
   if(pr.vacBal!=="")e.vacEnd=r1(num(pr.vacBal,0)+toV-t(pr.pto)*vacX(pr));
@@ -1374,8 +1420,9 @@ $("histAdd").onclick=()=>{const b=$("histAddBox");b.hidden=!b.hidden;renderHistA
 function saveHistEdit(i,vals,quiet){
   {const h0=state.mel.hist[i];if(h0&&h0.fill){const P=h0.p,v={hours:P.hours.slice(),otD:(P.otD||[]).slice(),pto:(P.pto||[]).slice(),sickD:(P.sickD||[]).slice(),holD:(P.holD||[]).slice()};Object.assign(v,vals);legacyInit(i,v,true);const nh=state.mel.hist[i];Object.keys(P).forEach(k=>delete P[k]);Object.assign(P,nh.p);nh.p=P;nh.fill=true;if(!quiet){write();save();render();}return {dQ:0,dV:0,dS:0};}}
   const s=state.mel,H=s.hist,h=H[i],[y,m,d]=h.pid.split("-").map(Number),os=new Date(y,m-1,d);
-  Object.assign(h.p,vals); const n=histFigures(h.p,os);
-  const dQ=r1(n.qEnd-(h.qEnd||0)), dV=(n.vacEnd!=null&&h.vacEnd!=null)?r1(n.vacEnd-h.vacEnd):0, dS=(n.sickEnd!=null&&h.sickEnd!=null)?r1(n.sickEnd-h.sickEnd):0, dE=r1(n.sickEEnd-(h.sickEEnd??n.sickEEnd));
+  // Before/after from the same math, so a rule change in the app never shows up as an edit.
+  const o=histFigures(h.p,os); Object.assign(h.p,vals); const n=histFigures(h.p,os);
+  const dQ=r1(n.qEnd-o.qEnd), dV=(n.vacEnd!=null&&o.vacEnd!=null)?r1(n.vacEnd-o.vacEnd):0, dS=(n.sickEnd!=null&&o.sickEnd!=null)?r1(n.sickEnd-o.sickEnd):0, dE=r1(n.sickEEnd-o.sickEEnd);
   const keep={pid:h.pid,p:h.p,st:h.st}; H[i]=Object.assign(keep,n);
   const endN=dayN(addD(os,13)), qBreak=toN=>QENDS.some(q=>{const [a,b,c]=q.split("-").map(Number),x=dayN(new Date(a,b-1,c));return x>=endN&&x<toN;});
   for(let j=i-1;j>=0;j--){const L=H[j],[ly,lm,ld]=L.pid.split("-").map(Number),lN=dayN(new Date(ly,lm-1,ld));const qOk=!qBreak(lN);
@@ -1443,7 +1490,7 @@ function rollLeave(){
     for(const w of [0,1]){
       if(aOff!==null&&!reset&&aOff<=7*w){sickE=0;reset=true;}
       const wh=wkWorked(s,w);
-      const cr=r1(wh/div); if(sickE<40){sickE=r1(sickE+cr);toS=r1(toS+cr);}else toV=r1(toV+cr);
+      const cr=r1(wh/div),r=wkSplit(sickE,cr,yEndAt(addD(os,7*w+7)));sickE=r.sickE;toS=r1(toS+r.toS);toV=r1(toV+r.toV);
     }
     if(aOff!==null&&!reset){sickE=0;reset=true;}
     s.sickE=String(sickE); $("sickE").value=sickE;
@@ -1528,10 +1575,10 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=33;
+const NOTES_VERSION=34;
 const NOTES=[
-  "The Pending check now always uses your Current setup (rate, 401(k), W-4, 3rd shift), so both checks match",
-  "Your setup line shows 3rd shift when that box is checked"
+  'PTO tab: hours worked since your anniversary. After 1,600 hrs, state law adds 1 hr sick per 40 hrs worked, on top of vacation',
+  'Fixed: copying your numbers in week 2 could lower your sick balance'
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

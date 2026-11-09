@@ -387,7 +387,7 @@ td{font-weight:600}
         <div class="field"><label for="mnpl">MNPL per month ($)</label><input id="mnpl" type="number" step="0.01" min="0"></div>
         <div class="field"><label for="ytd">Year-to-date gross ($)</label><input id="ytd" type="number" step="1" min="0" placeholder="0"></div>
       </div>
-      <p class="hint">Year-to-date gross is the YTD gross on your last stub, before this check. It stops Social Security at $184,500 for the year and adds the extra 0.9% Medicare over $200,000. Leave it blank if you're unsure.</p>
+      <p class="hint">YTD gross from your last stub, before this check. Leave it blank if you're not sure.</p>
       <details id="more" class="more">
         <summary>More deductions (optional)</summary>
         <div class="row">
@@ -420,7 +420,7 @@ td{font-weight:600}
       <p class="daydet" id="dd2" hidden></p>
       <button type="button" class="sicktog" id="sickTog" aria-expanded="false">＋ Add sick hours</button>
       <p class="gridmsg" id="gridMsg" role="status"></p>
-      <p class="hint">Regular = straight-time hours, up to 8 a day (less any PTO). Anything past that goes in OT. Saturday, Sunday and holidays are all OT. A holiday that falls on a weekend pays normal weekend rates; its 8 holiday hours are paid on the weekday the union calendar lists. PTO counts toward the day's first 8 hours. Tap H for a holiday. Tap a day name to see its pay.</p>
+      <p class="hint">Regular is straight time, up to 8 a day minus any PTO. The rest goes in OT. Weekends and holidays are all OT, and a holiday on a weekend pays normal weekend rates. Tap H for a holiday, or a day name to see its pay.</p>
       <div class="presets" id="presets">
         <span id="mine" class="mine"></span>
         <button id="mineAdd" type="button" class="madd">✎ Edit presets</button>
@@ -440,7 +440,7 @@ td{font-weight:600}
           <div class="field"><label for="hol">Holidays this check</label><input id="hol" type="number" step="1" min="0" value="0"></div>
           <div class="field"><label for="holw">Hours worked on holidays</label><input id="holw" type="number" step="0.5" min="0" value="0"></div>
         </div>
-        <p class="hint">These are totals you saved before PTO and holidays moved to each day. They still count. Set them to 0 once you've entered those days above.</p>
+        <p class="hint">Old totals from before PTO and holidays moved to each day. They still count. Set them to 0 once those days are entered above.</p>
       </div>
 
       <p class="label">This check</p>
@@ -506,7 +506,7 @@ td{font-weight:600}
     <div class="hres" id="hRes"></div>
     <button id="hAdd" class="primary" type="button">Put on day</button>
     <p class="hint" id="hMsg" style="margin-top:10px"></p>
-    <p class="hint">Type times as numbers: 746 is 7:46, 437 is 4:37. AM or PM is worked out from your shift; type 1637 if it guesses wrong. Minutes convert to tenths of an hour the same way most timekeeping systems do (tenths of an hour).</p>
+    <p class="hint">Type times as numbers: 746 = 7:46. AM/PM comes from your shift; type 1637 if it guesses wrong. Minutes round to tenths, same as timekeeping.</p>
   </section>
   <section class="panel hourspanel" id="histTab" hidden>
     <p class="label">Past pay periods</p>
@@ -528,7 +528,7 @@ td{font-weight:600}
     <div class="hres" id="vRes"></div>
   </section>
   <p class="sign">Built on the line, for the line.</p>
-  <p class="legal">Estimate only. Your paystub and timekeeping records are the official numbers. Not affiliated with, or endorsed by, any employer or union. Not tax, legal or financial advice. Provided as-is, with no guarantee of accuracy. Your numbers stay on your device; nothing is sent anywhere.</p>
+  <p class="legal">Estimate only. Your stub and timekeeping records are what count. Not from or endorsed by any employer or union. Not tax, legal or financial advice, and no guarantee it's right. Your numbers stay on your device.</p>
 </div>
 
 <div id="sticky" class="sticky" role="button" tabindex="0" aria-label="Show pay breakdown"><span>Take-home</span><b id="sNet">$0</b><span class="sg">Gross <b id="sGross">$0</b></span></div>
@@ -538,10 +538,10 @@ td{font-weight:600}
     <p class="label">Before you start</p>
     <h2 id="ackTitle">This is an estimate</h2>
     <ul>
-      <li>It estimates your paycheck. Your paystub and timekeeping records are the official numbers.</li>
-      <li>It's a free personal tool. It isn't made by, affiliated with, or endorsed by any employer or union.</li>
-      <li>It isn't tax, legal or financial advice, and it comes with no guarantee of accuracy.</li>
-      <li>Everything you enter stays on this device. Nothing is sent anywhere.</li>
+      <li>It estimates your paycheck. Your stub and timekeeping records are what count.</li>
+      <li>It's a free tool. It isn't from, or approved by, any employer or union.</li>
+      <li>It's not tax, legal or financial advice, and there's no guarantee it's right.</li>
+      <li>What you enter stays on this device. Nothing gets sent anywhere.</li>
     </ul>
     <button id="ackOk" class="primary" type="button">I understand</button>
   </div>
@@ -586,7 +586,7 @@ const QENDS=["2026-09-24","2026-12-17","2027-03-25","2027-06-24"];
 function renderQEnd(){const el=$("qEndNote"),t=new Date(),tn=dayN(t);let nx=null;
   for(const q of QENDS){const [y,m,d]=q.split("-").map(Number),dt=new Date(y,m-1,d);if(dayN(dt)>=tn){nx=dt;break;}}
   if(!nx){el.hidden=true;return;}const n=dayN(nx)-tn;
-  el.innerHTML=`Current quarter ends <b>${fmtD(nx)}, ${nx.getFullYear()}</b> (${n===0?"today":n===1?"tomorrow":n+" days"}). Overtime after that starts the new quarter at 0.`;el.hidden=false;}
+  el.innerHTML=`Current quarter ends <b>${fmtD(nx)}, ${nx.getFullYear()}</b> (${n===0?"today":n===1?"tomorrow":n+" days"}). OT after that counts toward the next quarter.`;el.hidden=false;}
 const CARD_END="2027-08-26";
 const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"], MONL=["January","February","March","April","May","June","July","August","September","October","November","December"], WD=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const ANCHOR=new Date(2026,8,25); // Fri Sep 25, 2026 starts a pay period (Oct 15 check)
@@ -933,7 +933,7 @@ function renderVac(s,c){
   const vWk=w=>r1(perV[w]-wkSum(s.pto,w)*vx), sWk=w=>r1(perS[w]-wkSum(s.sickD,w));
   const balW=st0.vac!==null?r1(st0.vac+vWk(0)+(wi?vWk(1):0)):null, sbalW=st0.sick!==null?r1(st0.sick+sWk(0)+(wi?sWk(1):0)):null;
   const sbal=st0.sick!==null?r1(st0.sick+toSick-sickUsed):null;
-  const lr=s.lRoll, rollNote=(!viz&&CAL&&lr&&lr.to===CAL.id)?(()=>{const [y,m,d]=lr.from.split("-").map(Number),os=new Date(y,m-1,d);return `<p class="hint vroll">Updated by itself from ${fmtD(os)} – ${fmtD(addD(os,13))}: vacation +${lr.toV} earned − ${lr.vacUsed} used, sick leave +${lr.toS} earned − ${lr.sickUsed} used${lr.reset?". Your anniversary passed, so sick leave earned this year started over":""}.</p>`;})():"";
+  const lr=s.lRoll, rollNote=(!viz&&CAL&&lr&&lr.to===CAL.id)?(()=>{const [y,m,d]=lr.from.split("-").map(Number),os=new Date(y,m-1,d);return `<p class="hint vroll">Rolled over from ${fmtD(os)} – ${fmtD(addD(os,13))}: vacation +${lr.toV} − ${lr.vacUsed} used, sick +${lr.toS} − ${lr.sickUsed} used${lr.reset?". Your anniversary passed, so sick earned started over":""}.</p>`;})():"";
   // projection to the next anniversary at this period's pace (sick leave resets then)
   let ann=null; if(!viz){ann=new Date(today.getFullYear(),sd.getMonth(),sd.getDate()); if(ann<=today)ann=new Date(today.getFullYear()+1,sd.getMonth(),sd.getDate());}
   const weeksLeft=viz?52:Math.max(0,Math.floor((dayN(ann)-dayN(today))/7)), avg=(wk[0]+wk[1])/2, crW=r1(avg/div);
@@ -951,7 +951,7 @@ function renderVac(s,c){
   let nowBox="", yrBox="";
   if(!viz){const yw=yrWorked(new Date());if(yw){const thr=Math.max(1600,Math.ceil(Math.max(40,st0.sickE)*40/10)*10),left=Math.max(0,thr-yw.hrs),eta=left>0&&yw.avgWk>0?addD(new Date(),Math.ceil(left/yw.avgWk*7)):null,n=v=>Math.round(v).toLocaleString("en-US");
     yrBox=`<div class="hsum hyr"><span>Hours worked since ${mdy(yw.ann)}<small>${yw.exact?"exact":`estimate until ${mdy(yw.next)}, ${yw.next.getFullYear()}`}</small></span><span>${yw.exact?"":"≈"}${n(yw.hrs)}</span></div>`+
-      `<p class="hint">${!yw.trust?"Add your sick earned above to check this.":lawOn||left===0?`Past ${n(thr)} hrs: sick grows 1 hr per 40 hrs worked, on top of vacation.`:`Sick grows again at ${n(thr)} hrs${eta?` · about ${mdy(eta)}`:""}.`}</p>`;}}
+      `<p class="hint">${!yw.trust?"Add your sick earned above to see where you stand.":lawOn||left===0?`You're past ${n(thr)} hrs, so you get 1 more sick hr per 40 worked. Vacation isn't affected.`:`More sick starts at ${n(thr)} hrs${eta?`, around ${mdy(eta)}`:""}.`}</p>`;}}
   if(who==="mel"&&VC&&!viz&&(s.periodId||CAL.id)===CAL.id&&(st0.vac!==null||st0.sick!==null)){
     // "Now" works like the timekeeping page: hours used come off the day they're used; earned hours only show up
     // once the page posts them, on the Saturday after each week ends.
@@ -967,7 +967,7 @@ function renderVac(s,c){
     `<div><span>Vacation ${endLbl}</span><b>${bal===null?"–":bal}</b><small>${bal===null?"add your balance above":endLine(viz?st0.vac:rawV,perV,s.pto,vx)}</small></div><div><span>Sick ${endLbl}</span><b>${sbal===null?"–":sbal}</b><small>${sbal===null?"add your balance above":endLine(viz?st0.sick:rawS,perS,s.sickD,1)}</small></div></div>`+
     rollNote+yrBox+
     `<div class="hsum"><span>${viz?"A full year at this pace":`By ${fmtD(ann)}, ${ann.getFullYear()} at this pace`}</span><span>+${pv} hrs vacation</span></div>`+
-    `<p class="hint" style="margin-top:8px">You earn 1 hr per ${div} paid hrs (${yrs} yrs seniority): hours worked (OT counts as 1), vacation, sick and holiday pay. Sick fills to 40 a year first, then vacation. State law adds 1 sick per 40 hrs worked after that. Sick restarts ${viz?"on your anniversary":fmtD(ann)}.${viz?(nextT?` 1 per ${vacDivisor(nextT)} at ${nextT} yrs.`:""):(yrs<5?" 1 per 16 at 5 yrs.":"")}</p>`;
+    `<p class="hint" style="margin-top:8px">You earn 1 hr per ${div} paid hrs at ${yrs} yrs. Worked, OT, vacation, sick and holiday hours all count. The first 40 go to sick, the rest to vacation. Sick starts over ${viz?"on your anniversary":fmtD(ann)}.${viz?(nextT?` 1 per ${vacDivisor(nextT)} at ${nextT} yrs.`:""):(yrs<5?" 1 per 16 at 5 yrs.":"")}</p>`;
 }
 function stampHolidays(){if(!CAL)return;DEF.forEach((_,k)=>{if(HOLIDAYS.has(CAL.dates[k]))$("hd"+k).setAttribute("aria-pressed","true");});}
 // Day rules: no regular hours on Sat, Sun or holidays; regular is capped at 8 minus PTO.
@@ -1089,27 +1089,27 @@ $("sticky").addEventListener("click",goResults);
 $("sticky").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();goResults();}});
 // Info buttons: what each box is and where to find it
 const INFO={
-  rate:"Your hourly rate from your stub, including lead pay. On 2nd shift add $1.25, on 3rd shift add $0.30. If you got a raise partway through this pay period, the check will be a little different from what's shown.",
-  k401:"The percent of your straight-time pay you put in your 401(k) before tax. It lowers your federal income tax now. Find all three 401(k) percents in Fidelity NetBenefits under Contributions.",
-  k401r:"Roth 401(k): comes out after tax, so it doesn't lower your tax now, but it grows tax-free. Put 0 if you don't use it.",
-  k401a:"After-tax 401(k) (not Roth): comes out after tax and is separate from Roth. Put 0 if you don't use it.",
-  extra:"Extra federal tax you chose on your W-4 (Step 4c). On your stub it shows as the additional withholding amount next to your federal tax info. Put 0 if you don't have one.",
-  credit:"The yearly dollar amount in Step 3 of your W-4, for kids and other dependents ($2,200 per child under 17, $500 per other dependent). You can see your W-4 on your employee pay portal. Put 0 if Step 3 is blank.",
-  oPre:"Dental, vision, FSA or anything else taken out before taxes on your stub. Add them up for one check.",
-  espp:"The percent of pay you put into your company stock purchase plan. It comes out after taxes, from straight-time pay only (regular, holiday, vacation and sick hours, not overtime), and buys company stock. Put 0 if you're not enrolled.",
-  oPost:"Life insurance, charity or anything else taken out after taxes on your stub. Add them up for one check.",
-  mnpl:"Machinists Non-Partisan Political League, the union's voluntary political fund. On your stub it comes out every other check. Put 0 if you don't contribute.",
-  ytd:"The year-to-date gross on your most recent stub, before the check you're figuring. Only matters near the yearly limits: Social Security stops at $184,500 and an extra 0.9% Medicare starts over $200,000.",
-  dues:"Dues and MNPL come out every other check. From the paystubs checked so far, union dues come out of the first check of the month and MNPL out of the second. A third check in the same month has neither (and no medical either). ⚠ Based on a few stubs, not yet confirmed.",
-  consW:"Copy Consecutive Weekends from the Overtime Summary on your timekeeping page. After 3 weekends in a row, the next weekend you work pays 2× for every hour. It counts forward by itself.",
-  q160h:"Copy Current Quarter Hours from the Overtime Summary on your timekeeping page, exactly as it shows. The page updates weekly (as of the end of last week), and the calculator knows which week that is. Below it you'll see your quarter OT after this week. After that you don't need to touch it: when a new pay period starts and you tap Start new period or Keep hours, it adds the last period's overtime by itself (and restarts at 0 when a quarter ends). Once you pass 160, every extra overtime hour that quarter pays 2×, and the calculator switches at the exact hour.",
-  hLunch:"Check this if you worked through your lunch and claimed it. Your lunch time is then paid instead of taken out, which adds it as overtime (0.5 hrs for a 30-minute lunch). Leave it unchecked if you took your normal unpaid lunch.",
-  senM:"Your seniority date sets your vacation rate. Find it with your leave balances in your timekeeping system. Enter the month, day and 4-digit year, like 1 / 13 / 2023.",
-  sickE:"Copy Earned Since Eligibility Date from the Sick Leave box on your timekeeping page. Once it reaches 40, everything you earn goes to vacation. It starts over on your anniversary date.",
-  vacBal:"Optional. Copy Hours Balance from the Vacation box on your timekeeping page. The page updates weekly; the calculator knows which week that is and shows your balance after this week. It adds this period's vacation and takes out the vacation hours you enter on the Paycheck tab. On Current it carries forward by itself each new pay period.",
-  sickBal:"Optional. Copy Hours Balance from the Sick Leave box on your timekeeping page. The calculator adds the sick leave you earn and takes out the sick hours you enter on the Paycheck tab. On Current it carries forward by itself each new pay period.",
-  shift3:"On 3rd shift, each hour worked counts as 8/6.5 hours toward vacation and sick credit, and a full 6.5-hour vacation day takes 8 hours from your balance.",
-  step2:"Only check this if Step 2 on your W-4 is checked (multiple jobs, or your spouse works). Your employer then withholds more federal tax from each check. You can see your W-4 on your employee pay portal."
+  rate:"Your hourly rate off your stub, lead pay included. 2nd shift: add $1.25. 3rd shift: add $0.30. A raise partway through the period will throw the check off a little.",
+  k401:"Your pre-tax 401(k) percent. It comes out of straight-time pay and lowers your tax now. All three 401(k) percents are in Fidelity NetBenefits under Contributions.",
+  k401r:"Roth 401(k) percent. Taxed now, grows tax-free. 0 if you don't use it.",
+  k401a:"After-tax 401(k) percent (not Roth). 0 if you don't use it.",
+  extra:"Extra federal tax from Step 4(c) on your W-4. Your stub calls it additional withholding. 0 if you don't have any.",
+  credit:"The yearly amount in Step 3 of your W-4: $2,200 per kid under 17, $500 per other dependent. 0 if Step 3 is blank.",
+  oPre:"Dental, vision, FSA, anything else taken out before tax. Add them up for one check.",
+  espp:"Your stock purchase plan percent. Comes out after tax, from straight-time pay only (no OT). 0 if you're not in it.",
+  oPost:"Life insurance, charity, anything else taken out after tax. Add them up for one check.",
+  mnpl:"The union's voluntary political fund. Comes out every other check. 0 if you don't give.",
+  ytd:"YTD gross from your last stub, before this check. Only matters near the yearly caps: Social Security stops at $184,500, and an extra 0.9% Medicare starts at $200,000.",
+  dues:"Dues come out on the month's 1st check, MNPL on the 2nd. A 3rd check in a month has neither (and no medical). Based on a few stubs, not confirmed yet.",
+  consW:"Copy Consecutive Weekends from the Overtime Summary. Work a 4th weekend in a row and every hour pays 2×. It counts forward on its own.",
+  q160h:"Copy Current Quarter Hours from the Overtime Summary, as is. The app knows which week the page is from. After that, leave it alone: it adds each period's OT when a new one starts and goes back to 0 when the quarter ends. Past 160, every OT hour pays 2×.",
+  hLunch:"Check this if you worked through lunch and claimed it. The 30 minutes gets paid as OT instead of taken out.",
+  senM:"Your seniority date sets your vacation rate. It's with your leave balances in timekeeping. Like 1 / 13 / 2023.",
+  sickE:"Copy Earned Since Eligibility Date from the Sick Leave box. After 40, credit goes to vacation. Past 1,600 hrs worked, state law adds more sick (see PTO tab). Starts over on your anniversary.",
+  vacBal:"Optional. Copy Hours Balance from the Vacation box. The app adds what you earn, takes out the vacation you enter, and carries it into each new pay period.",
+  sickBal:"Optional. Copy Hours Balance from the Sick Leave box. Works the same way as vacation.",
+  shift3:"On 3rd shift, every hour worked counts as 8/6.5 toward vacation and sick, and a 6.5-hr vacation day uses 8 hrs.",
+  step2:"Only check this if Step 2 on your W-4 is checked (2 jobs, or your spouse works). It takes out more federal tax."
 };
 Object.entries(INFO).forEach(([id,txt])=>{
   const inp=$(id); if(!inp)return;
@@ -1412,7 +1412,7 @@ function renderHistAdd(){
     const pid=$("histAddSel").value,vals=gridVals(box),[y,m,d]=pid.split("-").map(Number),os=new Date(y,m-1,d);
     const prev=ymd(addD(CAL.start,-14))===pid;
     const n=addPastEntry(pid,vals,prev);
-    n._open=true;n._msg=`Added. Take-home for this period: ${money(n.net)}.${prev?" Today's quarter OT and PTO already count these hours, so they didn't change.":""}`;
+    n._open=true;n._msg=`Added. Take-home for this period: ${money(n.net)}.${prev?" Today's quarter OT and PTO already had these hours, so they didn't change.":""}`;
     save();box.hidden=true;renderHist();renderHistAdd();};
 }
 $("histAdd").onclick=()=>{const b=$("histAddBox");b.hidden=!b.hidden;renderHistAdd();};
@@ -1437,7 +1437,7 @@ function saveHistEdit(i,vals,quiet){
 }
 function renderHist(){
   const L=state.mel.hist||[], el=$("histList"); el.textContent="";
-  if(!L.length){el.innerHTML=`<p class="hint">Nothing yet. When a new pay period starts and you tap Start new period or Keep hours, the one that just ended is saved here.</p>`;return;}
+  if(!L.length){el.innerHTML=`<p class="hint">Nothing yet. Each pay period lands here when the next one starts.</p>`;return;}
   const box=document.createElement("div"); box.className="hist";
   const md=x=>x.toLocaleDateString("en-US",{month:"short",day:"numeric"});
   L.forEach((h,i)=>{const [y,m,d]=h.pid.split("-").map(Number),os=new Date(y,m-1,d),[py,pm,pd]=h.pay.split("-").map(Number);
@@ -1463,20 +1463,20 @@ function renderHist(){
     const ed=dt.querySelector(".hedit");
     if(ed)ed.addEventListener("click",()=>{const f=dt.querySelector(".hform");if(!f.hidden){f.hidden=true;return;}
       const P=h.p||{hours:[],otD:[],pto:[],sickD:[]},v=(a,k)=>{const x=+(P[a]||[])[k]||0;return x?x:"";};
-      const t=(h.p?"":`<p class="hint">This one was saved before daily hours were kept. Enter its hours once and you can edit it like the others.</p>`)+hoursGrid(os,P);
+      const t=(h.p?"":`<p class="hint">Saved before daily hours were kept. Enter its hours once and it works like the others.</p>`)+hoursGrid(os,P);
 
       f.innerHTML=t+`<div class="hbtns"><button type="button" class="mini hsave">Save changes</button><button type="button" class="mini hcancel">Cancel</button></div>`;f.hidden=false;wireGrid(f);
       f.querySelector(".hcancel").onclick=()=>{f.hidden=true;};
       f.querySelector(".hsave").onclick=()=>{const vals=gridVals(f);
 
-        if(!h.p||h.fill){if(!h.p)legacyInit(i,vals);else saveHistEdit(i,vals,true);const nh=state.mel.hist[i];nh.fill=true;save();nh._open=true;nh._msg=`Saved. Take-home for this period: ${money(nh.net)}. Today's quarter OT and PTO already count these hours, so they didn't change.`;renderHist();return;}
+        if(!h.p||h.fill){if(!h.p)legacyInit(i,vals);else saveHistEdit(i,vals,true);const nh=state.mel.hist[i];nh.fill=true;save();nh._open=true;nh._msg=`Saved. Take-home for this period: ${money(nh.net)}. Today's quarter OT and PTO already had these hours, so they didn't change.`;renderHist();return;}
         const old=h.net,r=saveHistEdit(i,vals),nh=state.mel.hist[i],bits=[];
         bits.push(`Take-home ${money(old)} → ${money(nh.net)}`); if(r.dQ)bits.push(`quarter OT ${r.dQ>0?"+":""}${r.dQ}`); if(r.dV)bits.push(`vacation ${r.dV>0?"+":""}${r.dV}`); if(r.dS)bits.push(`sick ${r.dS>0?"+":""}${r.dS}`);
         nh._open=true; nh._msg=`Saved. ${bits.join(" · ")}${(r.dQ||r.dV||r.dS)?". Later periods and today's numbers were updated too.":"."}`; renderHist();};
     });
     box.appendChild(dt);});
   el.appendChild(box);
-  el.insertAdjacentHTML("beforeend",`<p class="hint">Estimates from the hours you entered. Saved on this phone; up to a year.</p>`);
+  el.insertAdjacentHTML("beforeend",`<p class="hint">Estimates from the hours you entered. Kept on this phone for up to a year.</p>`);
 }
 // Current: when a new pay period starts, carry vacation and sick balances forward from the period that ended.
 function rollLeave(){
@@ -1575,10 +1575,9 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=34;
+const NOTES_VERSION=35;
 const NOTES=[
-  'PTO tab: hours worked since your anniversary. After 1,600 hrs, state law adds 1 hr sick per 40 hrs worked, on top of vacation',
-  'Fixed: copying your numbers in week 2 could lower your sick balance'
+  'Shorter, plainer wording in the tips and hints. Same numbers'
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

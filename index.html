@@ -516,6 +516,7 @@ td{font-weight:600}
   </section>
   <section class="panel hourspanel" id="vacTab" hidden>
     <p class="label">Your vacation info</p>
+    <div class="copycur" id="copyCurV" hidden><span>Start from your real numbers:</span><span class="copybtns"><button id="copyCurVac" class="mini" type="button">Copy Current setup</button></span></div>
     <p class="hint asofh" id="asOfV" hidden></p>
     <div class="row">
       <div class="field" id="senF"><label for="senM">Seniority date</label><div class="mdy"><input id="senM" type="text" inputmode="numeric" maxlength="2" autocomplete="off" placeholder="MM" aria-label="Seniority month"><span>/</span><input id="senD" type="text" inputmode="numeric" maxlength="2" autocomplete="off" placeholder="DD" aria-label="Seniority day"><span>/</span><input id="senY" type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="YYYY" aria-label="Seniority year"></div><small class="tread" id="senR"></small></div>
@@ -900,7 +901,9 @@ function yrWorked(X){const s=state.mel,sd=parseDateMDY(s.senDate);if(!sd||!X)ret
   const avg=covN?cov/covN:(allN?all/allN:0), known=String(s.sickE??"").trim()!=="";
   // The day the typed numbers describe: the timekeeping page date, or the pay period start after skipped periods.
   const pS=(()=>{if(!s.periodId)return tN;const [y,m,d]=s.periodId.split("-").map(Number);return dayN(new Date(y,m-1,d));})();
-  const off=anchOff(s), AN=!known?tN:(s.anch&&off>=-1&&off<=1)?(()=>{const [y,m,d]=s.anch.split("-").map(Number);return dayN(new Date(y,m-1,d));})():pS;
+  const off=anchOff(s); let AN=!known?tN:(s.anch&&off>=-1&&off<=1)?(()=>{const [y,m,d]=s.anch.split("-").map(Number);return dayN(new Date(y,m-1,d));})():pS;
+  // Copied before last period's state-law sick posted: the page's sick earned only counts hours up to that period's start.
+  if(known&&s.cpd&&off===0){const [y,m,d]=s.cpd.split("-").map(Number);if(dayN(new Date(y,m-1,d))<pS-1+6)AN=Math.min(AN,pS-14);}
   // Before that day, missing days are estimated from your average. After it, the app only counts hours it has
   // (same as vacation and sick: skipped pay periods add nothing until you copy your numbers again).
   const part=(from,to)=>{let sum=0,miss=0;for(let n=from;n<to;n++){if(M.has(n))sum+=M.get(n);else if(n<AN)miss++;}return {sum,miss};};
@@ -910,8 +913,10 @@ function yrWorked(X){const s=state.mel,sd=parseDateMDY(s.senDate);if(!sd||!X)ret
   return {hrs:r1(x.sum+est),exact:(()=>{for(let n=aN;n<Math.min(xN,tN);n++)if(!M.has(n))return false;return true;})(),trust:x.miss===0||known,ann:a,next:new Date(a.getFullYear()+1,a.getMonth(),a.getDate()),avgWk:avg*7};}
 // One week's credit: the contract first (sick fills to 40, the rest is vacation), then the state minimum on top.
 // The contract always fills 40 faster than 1 per 40, so the state rule only matters once those 40 are in.
-function wkSplit(sickE,cr,yEnd){let toS=0,toV=0;if(sickE<40){sickE=r1(sickE+cr);toS=cr;}else toV=cr;
-  if(yEnd!=null&&sickE>=40){const L=lawSick(yEnd);if(L>sickE){toS=r1(toS+L-sickE);sickE=L;}}return {sickE,toS,toV};}
+function wkSplit(sickE,cr,yEnd){let toS=0,toV=0,lawX=0;if(sickE<40){sickE=r1(sickE+cr);toS=cr;}else toV=cr;
+  if(yEnd!=null&&sickE>=40){const L=lawSick(yEnd);if(L>sickE){lawX=r1(L-sickE);toS=r1(toS+lawX);sickE=L;}}return {sickE,toS,toV,lawX};}
+// The state-law sick posts once per pay period, after payroll runs: seen on the Wednesday after the period ends.
+const lawPostN=periodEnd=>dayN(periodEnd)+6;
 const yEndAt=d=>{const y=yrWorked(d);return y&&y.trust?y.hrs:null;};
 function renderVac(s,c){
   const el=$("vRes"), sd=parseDateMDY(s.senDate), raw=(s.senDate||"").trim();
@@ -930,7 +935,8 @@ function renderVac(s,c){
   const st0=starts(s); let sick=st0.sickE, toSick=0, toVac=0; const lines=[];
   const perV=[0,0],perS=[0,0];
   const P0=(!viz&&vcal())?vcal().start:null;
-  wk.forEach((h,w)=>{const cr=r1(h/div),r=wkSplit(sick,cr,P0?yEndAt(addD(P0,7*w+7)):null);sick=r.sickE;toSick=r1(toSick+r.toS);toVac=r1(toVac+r.toV);perS[w]=r.toS;perV[w]=r.toV;});
+  const perSL=[0,0];
+  wk.forEach((h,w)=>{const cr=r1(h/div),r=wkSplit(sick,cr,P0?yEndAt(addD(P0,7*w+7)):null);sick=r.sickE;toSick=r1(toSick+r.toS);toVac=r1(toVac+r.toV);perS[w]=r.toS;perV[w]=r.toV;perSL[w]=r.lawX;});
   const lawOn=sick>=40&&toSick>0;
   const ptoUsed=r1((s.pto||[]).reduce((a,v)=>a+(+v||0),0)*vacX(s)), sickUsed=r1((s.sickD||[]).reduce((a,v)=>a+(+v||0),0));
   const bal=st0.vac!==null?r1(st0.vac+toVac-ptoUsed):null;
@@ -956,17 +962,20 @@ function renderVac(s,c){
   let nowBox="", yrBox="";
   if(!viz){const yw=yrWorked(new Date());if(yw){const thr=Math.max(1600,Math.ceil(Math.max(40,st0.sickE)*40/10)*10),left=Math.max(0,thr-yw.hrs),eta=left>0&&yw.avgWk>0?addD(new Date(),Math.ceil(left/yw.avgWk*7)):null,n=v=>Math.round(v).toLocaleString("en-US");
     yrBox=`<div class="hsum hyr"><span>Hours worked since ${mdy(yw.ann)}<small>${yw.exact?"exact":`estimate until ${mdy(yw.next)}, ${yw.next.getFullYear()}`}</small></span><span>${yw.exact?"":"≈"}${n(yw.hrs)}</span></div>`+
-      `<p class="hint">${!yw.trust?"Add your sick earned above to see where you stand.":lawOn||left===0?`You're past ${n(thr)} hrs, so you get 1 more sick hr per 40 worked. Vacation isn't affected.`:`More sick starts at ${n(thr)} hrs${eta?`, around ${mdy(eta)}`:""}.`}</p>`;}}
+      `<p class="hint">${!yw.trust?"Add your sick earned above to see where you stand.":lawOn||left===0?`You're past 1,600 hrs, so you get 1 more sick hr per 40 worked. It posts once a pay period. Vacation isn't affected.`:`More sick starts at ${n(thr)} hrs${eta?`, around ${mdy(eta)}`:""}.`}</p>`;}}
   if(who==="mel"&&VC&&!viz&&(s.periodId||CAL.id)===CAL.id&&(st0.vac!==null||st0.sick!==null)){
     // "Now" works like the timekeeping page: hours used come off the day they're used; earned hours only show up
     // once the page posts them, on the Saturday after each week ends.
     const tN=dayN(new Date()),posted=endDate=>dayN(endDate)+2<=tN,done=w=>posted(addD(VC.start,7*w+6)),usedTo=a=>{let t=0;for(let k=0;k<14;k++){const [y,m,d]=VC.dates[k].split("-").map(Number);if(dayN(new Date(y,m-1,d))<=tN)t+=+(a||[])[k]||0;}return t;};
     // The start-of-period numbers include last period's final week. If that week isn't posted yet, take its credit back out.
-    let unV=0,unS=0;
-    if(!posted(addD(VC.start,-1))){const ph=(s.hist||[]).find(x=>x.pid===ymd(addD(VC.start,-14))),sd=parseDateMDY(s.senDate);
-      if(ph&&ph.p&&sd){const div=vacDivisor(yrsBetween(sd,addD(VC.start,-1)));let se=Math.max(0,num(ph.p.sickE,0));[0,1].forEach(w=>{const cr=r1(wkWorked(ph.p,w)/div),r=wkSplit(se,cr,yEndAt(addD(VC.start,-7+7*w)));se=r.sickE;if(w===1){unS=r.toS;unV=r.toV;}});}}
+    // State-law sick (whole period) shows up the Wednesday after the period ends, later than the weekly credit.
+    let unV=0,unS=0;{const ph=(s.hist||[]).find(x=>x.pid===ymd(addD(VC.start,-14))),sd=parseDateMDY(s.senDate);
+      if(ph&&ph.p&&sd){const div=vacDivisor(yrsBetween(sd,addD(VC.start,-1)));let se=Math.max(0,num(ph.p.sickE,0)),law=0,w2S=0,w2V=0;
+        [0,1].forEach(w=>{const cr=r1(wkWorked(ph.p,w)/div),r=wkSplit(se,cr,yEndAt(addD(VC.start,-7+7*w)));se=r.sickE;law=r1(law+r.lawX);if(w===1){w2S=r1(r.toS-r.lawX);w2V=r.toV;}});
+        if(!posted(addD(VC.start,-1))){unS=w2S;unV=w2V;}
+        if(lawPostN(addD(VC.start,-1))>tN)unS=r1(unS+law);}}
     const vNow=st0.vac===null?null:r1(st0.vac-unV+[0,1].reduce((t,w)=>t+(done(w)?perV[w]:0),0)-usedTo(s.pto)*vx);
-    const sNow=st0.sick===null?null:r1(st0.sick-unS+[0,1].reduce((t,w)=>t+(done(w)?perS[w]:0),0)-usedTo(s.sickD));
+    const sNow=st0.sick===null?null:r1(st0.sick-unS+[0,1].reduce((t,w)=>t+(done(w)?perS[w]-perSL[w]:0),0)-usedTo(s.sickD));
     nowBox=`<div class="hbig hnow"><div><span>Vacation now</span><b>${vNow===null?"–":vNow}</b><small>today, ${mdy(new Date())}</small></div><div><span>Sick now</span><b>${sNow===null?"–":sNow}</b><small>today, ${mdy(new Date())}</small></div></div>`;}
   el.innerHTML=`<p class="vsrc">${src}</p>${nowBox}<div class="hbig"><div class="otw"><span>Vacation earned</span><b>${addV}</b><small>${sub}</small></div><div class="pto"><span>Sick leave earned</span><b>${addS}</b><small>${lawOn?"1 per 40 hrs worked":sick>=40?"40 done this year":`${r1(sick)} of 40 this year`}</small></div>`+
     `<div><span>Vacation ${endLbl}</span><b>${bal===null?"–":bal}</b><small>${bal===null?"add your balance above":endLine(viz?st0.vac:rawV,perV,s.pto,vx)}</small></div><div><span>Sick ${endLbl}</span><b>${sbal===null?"–":sbal}</b><small>${sbal===null?"add your balance above":endLine(viz?st0.sick:rawS,perS,s.sickD,1)}</small></div></div>`+
@@ -1022,7 +1031,7 @@ function render(){renderQEnd();
   const c=calc(s);
   {const qa=$("qAfter"),on=who==="mel"&&!!CAL&&(s.periodId||CAL.id)===CAL.id;qa.hidden=!on;if(on){const wi=weekIdx(),v=+c.qWk[wi].toFixed(1),pe=+c.qEnd.toFixed(1);
     qa.innerHTML=`<span>Quarter OT at end of pay period<small>${pe>=160?"Past 160: extra OT pays 2×":`${+(160-pe).toFixed(1)} hrs to go until 160`}${wi===0?` · after this week: ${v}`:""}${c.qReset?" · new quarter started this period":""}</small></span><b>${pe} hrs</b>`;}}
-  $("copyCurRow").hidden=who!=="tif";
+  $("copyCurRow").hidden=who!=="tif"; $("copyCurV").hidden=who!=="tif";
   $("presets").hidden=who!=="tif";   // presets are for what-ifs only
   renderCal(s);
   renderHours(s);
@@ -1252,7 +1261,7 @@ const pageAnch=()=>ymd(addD(pageAsOf(),1));   // the Friday after the page's dat
 // Where the copied numbers start, in weeks from this pay period's first day: -1 = last week of the previous period, 0, or 1.
 function anchOff(s){if(s!==state.mel||!CAL)return 0;const a=s.anch||pageAnch(),pid=s.periodId||CAL.id,[y,m,d]=pid.split("-").map(Number),[ay,am,ad]=a.split("-").map(Number);return Math.round((dayN(new Date(ay,am-1,ad))-dayN(new Date(y,m-1,d)))/7);}
 function asOfWk1(s){return anchOff(s)===1;}
-["q160h","vacBal","sickBal","sickE","consW"].forEach(id=>$(id).addEventListener("input",()=>{if(who!=="mel"||!CAL||(state.mel.periodId||CAL.id)!==CAL.id)return;state.mel.anch=pageAnch();render();}));
+["q160h","vacBal","sickBal","sickE","consW"].forEach(id=>$(id).addEventListener("input",()=>{if(who!=="mel"||!CAL||(state.mel.periodId||CAL.id)!==CAL.id)return;state.mel.anch=pageAnch();state.mel.cpd=ymd(new Date());render();}));
 function wkOT(s,w){let t=0;for(const i of ORDER){const k=w*7+i,d=dayPay(i,(+s.hours[k]||0)+(+(s.otD||[])[k]||0),ptoAt(s,k),(s.holD||[])[k]);t+=d.ot+d.dt+d.holW;}return r1(t);}
 function wkWorked(s,w){let t=0;for(let k=w*7;k<w*7+7;k++)t+=paidHrs(s,k);return t;}
 function wkSum(a,w){let t=0;for(let k=w*7;k<w*7+7;k++)t+=+(a||[])[k]||0;return t;}
@@ -1271,6 +1280,11 @@ function starts(s){
     if(o.sick!==null)o.sick=r1(raw.sick+cS-wkSum(P.sickD,1));
     return o;
   }
+  if(off===0&&s===state.mel&&s.cpd&&CAL){ // copied before last period's state-law sick posted: it's still coming
+    const pid=s.periodId||CAL.id,[y,m,d]=pid.split("-").map(Number),ps=addD(new Date(y,m-1,d),-14),cp=s.cpd.split("-").map(Number);
+    const h=(s.hist||[]).find(x=>x.pid===ymd(ps));
+    if(h&&h.p&&dayN(new Date(cp[0],cp[1]-1,cp[2]))<lawPostN(addD(ps,13))){const L=histFigures(h.p,ps).lawS||0;
+      if(L>0){const o={...raw};o.sickE=r1(raw.sickE+L);if(o.sick!==null)o.sick=r1(raw.sick+L);return o;}}}
   if(off!==1)return raw;
   const o={...raw}; o.q=Math.max(0,r1(raw.q-wkOT(s,0)));
   let cS=0,cV=0; const sd=parseDateMDY(s.senDate);
@@ -1344,14 +1358,14 @@ function histFigures(pr,os){
   const e={pay:ymd(oc.pay),reg:r1(c.st),ot:r1(c.ot),dt:r1(c.dt),vac:t(pr.pto),sick:t(pr.sickD),hol:r1(c.holH),
     stPay:f2(c.stPay),otPay:f2(c.otPay),dtPay:f2(c.dtPay),holPay:f2(c.holPay||0),gross:f2(c.gross),fed:f2(c.fed),fica:f2(c.fica),
     other:f2(c.gross-c.fed-c.fica-c.net),net:f2(c.net),rate:c.r,qEnd:r1(c.qEnd)};
-  const sd=parseDateMDY(pr.senDate); let sickE=Math.max(0,num(pr.sickE,0)),toS=0,toV=0;
+  const sd=parseDateMDY(pr.senDate); let sickE=Math.max(0,num(pr.sickE,0)),toS=0,toV=0,lawS=0;
   if(sd){const div=vacDivisor(yrsBetween(sd,addD(os,13)));let aOff=null;
     for(const Y of [os.getFullYear(),os.getFullYear()+1]){const o=dayN(new Date(Y,sd.getMonth(),sd.getDate()))-dayN(os);if(o>=0&&o<=13&&aOff===null)aOff=o;}
     let reset=false;for(const w of [0,1]){if(aOff!==null&&!reset&&aOff<=7*w){sickE=0;reset=true;}
       const wh=wkWorked(pr,w);
-      const cr=r1(wh/div),r=wkSplit(sickE,cr,yEndAt(addD(os,7*w+7)));sickE=r.sickE;toS=r1(toS+r.toS);toV=r1(toV+r.toV);}
+      const cr=r1(wh/div),r=wkSplit(sickE,cr,yEndAt(addD(os,7*w+7)));sickE=r.sickE;toS=r1(toS+r.toS);toV=r1(toV+r.toV);lawS=r1(lawS+r.lawX);}
     if(aOff!==null&&!reset)sickE=0;}
-  e.sickEEnd=sickE; e.vacEarned=sd?toV:null; e.sickEarned=sd?toS:null;
+  e.sickEEnd=sickE; e.lawS=lawS; e.vacEarned=sd?toV:null; e.sickEarned=sd?toS:null;
   if(pr.vacBal!=="")e.vacEnd=r1(num(pr.vacBal,0)+toV-t(pr.pto)*vacX(pr));
   if(pr.sickBal!=="")e.sickEnd=r1(num(pr.sickBal,0)+toS-t(pr.sickD));
   return e;
@@ -1535,7 +1549,7 @@ function renderQRoll(){
   el.innerHTML=r.reset?(r.val?`Updated by itself: a new quarter started, so it restarted at 0 and counted only the overtime after the quarter ended (<b>${r.val} hrs</b>).`:`Updated by itself: a new quarter started, so it reset to <b>0</b>.`):`Updated by itself: added <b>${r.add} OT hrs</b> from ${fmtD(os)} – ${fmtD(addD(os,13))}.`;
   el.hidden=false;
 }
-$("npClear").onclick=()=>{read();snapPeriod();rollLeave();rollQuarter();addEnds();state.mel.anch=CAL.id;clearDays();};
+$("npClear").onclick=()=>{read();snapPeriod();rollLeave();rollQuarter();addEnds();state.mel.anch=CAL.id;delete state.mel.cpd;clearDays();};
 
 // Visualize: copy Current's setup (pay setup, deductions, shift). Hours stay as they are.
 const SETUP_KEYS=["senDate","sickE","vacBal","sickBal","shift3","rate","k401","k401r","k401a","extra","loan","fs","med","duesAmt","mnpl","ytd","credit","oPre","oPost","espp","step2","hsS","hsE","hsL"];
@@ -1566,26 +1580,28 @@ $("copyCurH").onclick=()=>confirmTap($("copyCurH"),()=>{
   }
   state.tif.holStash={}; selDay=null; render();
 });
-$("copyCur").onclick=()=>confirmTap($("copyCur"),()=>{
-  read(); const src=state.mel, dst=state.tif;
+// Seniority date becomes years of seniority, since that's what Visualize uses.
+function copySetup(){read(); const src=state.mel, dst=state.tif;
   SETUP_KEYS.forEach(k=>{if(src[k]!==undefined)dst[k]=src[k];});
-  write(); render();
-});
+  const sd=parseDateMDY(src.senDate); if(sd)dst.senYrs=String(Math.max(0,yrsBetween(sd,new Date())));
+  write(); render();}
+$("copyCur").onclick=()=>confirmTap($("copyCur"),copySetup);
+$("copyCurVac").onclick=()=>confirmTap($("copyCurVac"),copySetup);
 $("tabPay").onclick=()=>showTab("pay"); $("tabHrs").onclick=()=>showTab("hrs"); $("tabVac").onclick=()=>showTab("vac"); $("tabHist").onclick=()=>showTab("hist");
 [["senM","senD",2],["senD","senY",2]].forEach(([a,b,n])=>$(a).addEventListener("input",()=>{if($(a).value.replace(/\D/g,"").length>=n)$(b).focus();}));
 $("hDay").addEventListener("change",()=>{const k=+$("hDay").value;$("hHol").checked=vcal()?HOLIDAYS.has(vcal().dates[k]):$("hd"+k).getAttribute("aria-pressed")==="true";$("hMsg").textContent="";render();});
 $("hAdd").onclick=()=>{const s=state[who],h=hoursCalc(s);if(!h)return;{const rg=+h.d.st.toFixed(1);$("h"+h.k).value=rg;$("o"+h.k).value=+(h.w-rg).toFixed(1)||"";}$("p"+h.k).value=h.p||"";$("hd"+h.k).setAttribute("aria-pressed",h.hol);selDay=h.k;render();$("hMsg").textContent=`Put on ${dayLabel(h.k)}: ${h.w} hrs worked${h.p?`, ${h.p} PTO`:""}${h.hol?", holiday":""}. Switch to Paycheck to see your check.`;};
-$("npKeep").onclick=()=>{read();snapPeriod();rollLeave();rollQuarter();addEnds();state.mel.anch=CAL.id;state.mel.periodId=CAL.id;render();};
+$("npKeep").onclick=()=>{read();snapPeriod();rollLeave();rollQuarter();addEnds();state.mel.anch=CAL.id;delete state.mel.cpd;state.mel.periodId=CAL.id;render();};
 // Keep the calendar on today's date: recheck every minute and whenever the app comes back to the screen
 function tick(){const t=new Date(),c=calFor(t);const changed=!CAL||c.todayYmd!==CAL.todayYmd;CAL=c;if(changed)render();}
 setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=36;
+const NOTES_VERSION=37;
 const NOTES=[
-  'Vacation and sick only pay up to your balance, like payroll does. Anything over shows as not paid',
-  'WA L&I now counts every paid hour, matching the stub'
+  'Extra sick from the 1,600-hr rule now posts once a pay period, the Wednesday after it ends, like the timekeeping page',
+  'Visualize: Copy Current setup is on the PTO tab too, and turns your seniority date into years'
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

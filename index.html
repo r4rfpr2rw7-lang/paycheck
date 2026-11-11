@@ -209,6 +209,11 @@ tr.tot td{border-bottom:0;border-top:2px solid var(--ink);font-weight:700;paddin
 .hres .hsum span:last-child{font-family:var(--f-num)}
 .hres .hyr small{display:block;font-weight:400;font-size:.8em;opacity:.75}
 .hres .hyr{margin-top:10px}
+.leavew{margin:10px 0 4px;font-size:.92em;line-height:1.45}
+.leavew b{font-family:var(--f-num)}
+.leavew .lw{display:block;color:#c0392b;font-weight:600}
+.leavew .ls{display:block;opacity:.75}
+input.over{border-color:#c0392b!important;box-shadow:0 0 0 2px rgba(192,57,43,.25)}
 .hres{margin:14px 0}
 .hres .hbig{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px}
 .hres .hbig div{border:1.5px solid var(--ink);border-radius:3px;padding:8px 10px;background:var(--bg)}
@@ -420,6 +425,7 @@ td{font-weight:600}
       <p class="daydet" id="dd2" hidden></p>
       <button type="button" class="sicktog" id="sickTog" aria-expanded="false">＋ Add sick hours</button>
       <p class="gridmsg" id="gridMsg" role="status"></p>
+      <p class="leavew" id="leaveAv" hidden></p>
       <p class="hint">Regular is straight time, up to 8 a day minus any PTO. The rest goes in OT. Weekends and holidays are all OT, and a holiday on a weekend pays normal weekend rates. Tap H for a holiday, or a day name to see its pay.</p>
       <div class="presets" id="presets">
         <span id="mine" class="mine"></span>
@@ -1042,6 +1048,7 @@ function render(){renderQEnd();
   $("setupSum").textContent=(who==="prev"?"Using your Current setup · ":"")+((+s.rate>0)?`Your setup · $${(+s.rate).toFixed(2)}/hr · 401(k) ${+((+s.k401||0)+(+s.k401r||0)+(+s.k401a||0)).toFixed(2)}% · ${FSN[s.fs]||FSN.mfj}`:"Your setup · start here")+(s.shift3?" · 3rd shift":"");
   const noRate=!(+s.rate>0);
   $("sNet").textContent=noRate?"Add your rate":money(c.net); $("sGross").textContent=noRate?"—":money(c.gross);
+  renderLeave(s);
   $("wk1t").textContent=wkT(0,7);
   $("wk2t").textContent=wkT(7,14);
   DEF.forEach((_,k)=>$("dn"+k).setAttribute("aria-pressed",k===selDay));
@@ -1580,6 +1587,27 @@ $("copyCurH").onclick=()=>confirmTap($("copyCurH"),()=>{
   }
   state.tif.holStash={}; selDay=null; render();
 });
+// Vacation and sick you don't have yet: payroll only pays what's in your balance at the start of the pay period
+// (time you earn during the period can't be used until the next one). Warn on the day, before you take it.
+function leaveCheck(s){
+  if(!(who==="mel"||who==="prev")||!CAL)return null;
+  if(who==="mel"&&(s.periodId||CAL.id)!==CAL.id)return null;
+  const s0=starts(s),vx=vacX(s),out={vac:s0.vac,sick:s0.sick,overV:{},overS:{},cutV:0,cutS:0,days:[]};
+  let lv=s0.vac,ls=s0.sick;
+  for(const w of [0,1])for(const i of ORDER){const k=w*7+i,v=(+(s.pto||[])[k]||0)*vx,sk=+(s.sickD||[])[k]||0;
+    if(lv!==null&&v>0){const x=r1(Math.max(0,v-Math.max(0,lv)));if(x>0){out.overV[k]=x;out.cutV=r1(out.cutV+x);out.days.push([k,"vacation",x]);}lv=r1(lv-v);}
+    if(ls!==null&&sk>0){const x=r1(Math.max(0,sk-Math.max(0,ls)));if(x>0){out.overS[k]=x;out.cutS=r1(out.cutS+x);out.days.push([k,"sick",x]);}ls=r1(ls-sk);}}
+  out.leftV=lv;out.leftS=ls;return out;}
+function renderLeave(s){
+  const el=$("leaveAv"),L=leaveCheck(s);
+  DEF.forEach((_,k)=>{$("p"+k).classList.toggle("over",!!(L&&L.overV[k]));$("sk"+k).classList.toggle("over",!!(L&&L.overS[k]));});
+  if(!L||(L.vac===null&&L.sick===null)){el.hidden=true;return;}
+  const dn=k=>{const VC=vcal();if(!VC)return "";const [y,m,d]=VC.dates[k].split("-").map(Number);return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(y,m-1,d).getDay()]+" "+m+"/"+d;};
+  let h=`<span>Left to use this pay period: ${L.vac===null?"":`<b>${r1(Math.max(0,L.leftV))}</b> vacation`}${L.vac!==null&&L.sick!==null?" · ":""}${L.sick===null?"":`<b>${r1(Math.max(0,L.leftS))}</b> sick`}</span>`;
+  L.days.forEach(([k,t,x])=>{h+=`<span class="lw">${dn(k)}: ${x} hrs ${t} won't be paid. You don't have it yet.</span>`;});
+  if(who==="mel"){const c=s.cpd||s.anch;if(c){const [y,m,d]=c.split("-").map(Number),age=dayN(new Date())-dayN(new Date(y,m-1,d));
+    if(age>14)h+=`<span class="ls">Your balances were copied ${age} days ago. Copy your timekeeping page again so these stay right.</span>`;}}
+  el.innerHTML=h;el.hidden=false;}
 // Seniority date becomes years of seniority, since that's what Visualize uses.
 function copySetup(){read(); const src=state.mel, dst=state.tif;
   SETUP_KEYS.forEach(k=>{if(src[k]!==undefined)dst[k]=src[k];});
@@ -1598,10 +1626,10 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=37;
+const NOTES_VERSION=38;
 const NOTES=[
-  'Extra sick from the 1,600-hr rule now posts once a pay period, the Wednesday after it ends, like the timekeeping page',
-  'Visualize: Copy Current setup is on the PTO tab too, and turns your seniority date into years'
+  'Paycheck tab shows how much vacation and sick you have left. A day turns red if you enter more than you have, since that part won’t be paid',
+  'Reminder to copy your timekeeping page again when your numbers are over 2 weeks old'
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

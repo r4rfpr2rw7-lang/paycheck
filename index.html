@@ -698,7 +698,7 @@ function calc(p,calOv){
   const r=+p.rate||0;
   // Payroll only pays vacation and sick you have (Nov 12 stub: 15.6 vacation asked, 12.9 paid). The rest goes unpaid.
   let vacCut=0,sickCut=0,vacAvail=null,sickAvail=null;
-  if(p===state.mel||p===state.prev){try{const s0=starts(p),sum=a=>(a||[]).reduce((t,x)=>t+(+x||0),0);
+  if(p===state.mel||p===state.prev||p===state.tif){try{const s0=starts(p),sum=a=>(a||[]).reduce((t,x)=>t+(+x||0),0);
     if(String(p.vacBal??"").trim()!==""){vacAvail=Math.max(0,+s0.vac||0);vacCut=r1(Math.max(0,sum(p.pto)-vacAvail));}
     if(String(p.sickBal??"").trim()!==""){sickAvail=Math.max(0,+s0.sick||0);sickCut=r1(Math.max(0,sum(p.sickD)-sickAvail));}}catch(e){}}
   const stPay=(st+pto-vacCut-sickCut+leave+holH)*r, otPay=ot*r*1.5, dtPay=dt*r*2;
@@ -1590,7 +1590,7 @@ $("copyCurH").onclick=()=>confirmTap($("copyCurH"),()=>{
 // Vacation and sick you don't have yet: payroll only pays what's in your balance at the start of the pay period
 // (time you earn during the period can't be used until the next one). Warn on the day, before you take it.
 function leaveCheck(s){
-  if(!(who==="mel"||who==="prev")||!CAL)return null;
+  if(!(who==="mel"||who==="prev"||who==="tif")||!CAL)return null;
   if(who==="mel"&&(s.periodId||CAL.id)!==CAL.id)return null;
   const s0=starts(s),vx=vacX(s),out={vac:s0.vac,sick:s0.sick,overV:{},overS:{},cutV:0,cutS:0,days:[]};
   let lv=s0.vac,ls=s0.sick;
@@ -1602,7 +1602,7 @@ function renderLeave(s){
   const el=$("leaveAv"),L=leaveCheck(s);
   DEF.forEach((_,k)=>{$("p"+k).classList.toggle("over",!!(L&&L.overV[k]));$("sk"+k).classList.toggle("over",!!(L&&L.overS[k]));});
   if(!L||(L.vac===null&&L.sick===null)){el.hidden=true;return;}
-  const dn=k=>{const VC=vcal();if(!VC)return "";const [y,m,d]=VC.dates[k].split("-").map(Number);return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(y,m-1,d).getDay()]+" "+m+"/"+d;};
+  const dn=k=>{const VC=vcal();if(!VC)return ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][k%7]+` (week ${k<7?1:2})`;const [y,m,d]=VC.dates[k].split("-").map(Number);return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(y,m-1,d).getDay()]+" "+m+"/"+d;};
   let h=`<span>Left to use this pay period: ${L.vac===null?"":`<b>${r1(Math.max(0,L.leftV))}</b> vacation`}${L.vac!==null&&L.sick!==null?" · ":""}${L.sick===null?"":`<b>${r1(Math.max(0,L.leftS))}</b> sick`}</span>`;
   L.days.forEach(([k,t,x])=>{h+=`<span class="lw">${dn(k)}: ${x} hrs ${t} won't be paid. You don't have it yet.</span>`;});
   if(who==="mel"){const c=s.cpd||s.anch;if(c){const [y,m,d]=c.split("-").map(Number),age=dayN(new Date())-dayN(new Date(y,m-1,d));
@@ -1626,10 +1626,9 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=38;
+const NOTES_VERSION=39;
 const NOTES=[
-  'Paycheck tab shows how much vacation and sick you have left. A day turns red if you enter more than you have, since that part won’t be paid',
-  'Reminder to copy your timekeeping page again when your numbers are over 2 weeks old'
+  'Visualize warns too when you plan more vacation or sick than you have'
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

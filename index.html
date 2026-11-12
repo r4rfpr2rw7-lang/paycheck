@@ -390,7 +390,7 @@ td{font-weight:600}
         <div class="field"><label for="med">Medical per check ($)</label><input id="med" type="number" step="0.01" min="0"></div>
         <div class="field"><label for="duesAmt">Union dues per month ($)</label><input id="duesAmt" type="number" step="0.01" min="0"></div>
         <div class="field"><label for="mnpl">MNPL per month ($)</label><input id="mnpl" type="number" step="0.01" min="0"></div>
-        <div class="field"><label for="ytd">Year-to-date gross ($)</label><input id="ytd" type="number" step="1" min="0" placeholder="0"></div>
+        <div class="field"><label for="ytd">Year-to-date gross, as of latest paycheck ($)</label><input id="ytd" type="number" step="1" min="0" placeholder="0"></div>
       </div>
       <p class="hint">YTD gross from your last stub, before this check. Leave it blank if you're not sure.</p>
       <details id="more" class="more">
@@ -1626,9 +1626,9 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=39;
+const NOTES_VERSION=40;
 const NOTES=[
-  'Visualize warns too when you plan more vacation or sick than you have'
+  'Year-to-date gross now says to use your latest paycheck'
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

@@ -698,9 +698,8 @@ function calc(p,calOv){
   const r=+p.rate||0;
   // Payroll only pays vacation and sick you have (Nov 12 stub: 15.6 vacation asked, 12.9 paid). The rest goes unpaid.
   let vacCut=0,sickCut=0,vacAvail=null,sickAvail=null;
-  if(p===state.mel||p===state.prev||p===state.tif){try{const s0=starts(p),sum=a=>(a||[]).reduce((t,x)=>t+(+x||0),0);
-    if(String(p.vacBal??"").trim()!==""){vacAvail=Math.max(0,+s0.vac||0);vacCut=r1(Math.max(0,sum(p.pto)-vacAvail));}
-    if(String(p.sickBal??"").trim()!==""){sickAvail=Math.max(0,+s0.sick||0);sickCut=r1(Math.max(0,sum(p.sickD)-sickAvail));}}catch(e){}}
+  if(p===state.mel||p===state.prev||p===state.tif){try{const L=leaveLedger(p);
+    if(L){vacCut=L.cutV;sickCut=L.cutS;vacAvail=L.availV;sickAvail=L.availS;}}catch(e){}}
   const stPay=(st+pto-vacCut-sickCut+leave+holH)*r, otPay=ot*r*1.5, dtPay=dt*r*2;
   const holPay=holW*r*2;
   const gross=stPay+otPay+dtPay+holPay;
@@ -1001,8 +1000,9 @@ function normalizeDays(){
     let reg=Math.max(0,+hi.value||0), ot=Math.max(0,+oi.value||0), pto=Math.max(0,ptoIn(k));
     const cap=off?0:Math.max(0,8-pto);
     if(reg>cap){
-      const x=+(reg-cap).toFixed(2), typing=!off&&document.activeElement===hi;
+      const x=+(reg-cap).toFixed(2), ae=document.activeElement, typing=!off&&ae===hi, ptoTyping=!off&&(ae===$("p"+k)||ae===$("sk"+k));
       if(typing){reg=cap;hi.value=reg;moved.push([k,x,off,true]);}          // typing in Regular: stop at the cap
+      else if(ptoTyping){reg=cap;hi.value=reg;moved.push([k,x,off,"pto"]);}  // typing vacation/sick: it replaces regular hours, OT stays as is
       else{ot=+(ot+x).toFixed(2);reg=cap;hi.value=reg;oi.value=ot;moved.push([k,x,off,false]);} // PTO, holiday or older entry: move the extra to OT
     }
     hi.disabled=off; hi.placeholder=off?"\u2013":"";
@@ -1014,11 +1014,11 @@ let gridMsgT;
 function flashGrid(moved){
   if(!moved.length)return;
   const [k,x,off,typing]=moved[moved.length-1], cap=Math.max(0,8-ptoIn(k));
-  $("gridMsg").textContent=off?`${k%7>=5?DAYS[k%7]:"Holiday"} hours are all OT, so ${x} hrs moved to OT.`:typing?`Regular stops at ${cap} hrs that day. Put the rest in OT.`:`Regular stops at ${cap} hrs that day, so ${x} hrs moved to OT.`;
+  $("gridMsg").textContent=off?`${k%7>=5?DAYS[k%7]:"Holiday"} hours are all OT, so ${x} hrs moved to OT.`:typing==="pto"?`Regular drops to ${cap} hrs, since vacation and sick fill the rest of the 8.`:typing?`Regular stops at ${cap} hrs that day. Put the rest in OT.`:`Regular stops at ${cap} hrs that day, so ${x} hrs moved to OT.`;
   clearTimeout(gridMsgT); gridMsgT=setTimeout(()=>{$("gridMsg").textContent="";},5000);
 }
 function render(){renderQEnd();
-  const moved=normalizeDays(); if(document.activeElement&&/^[hop]\d+$/.test(document.activeElement.id||""))flashGrid(moved);
+  const moved=normalizeDays(); if(document.activeElement&&/^(h|o|p|sk)\d+$/.test(document.activeElement.id||""))flashGrid(moved);
   read();renderQRoll();renderSick();renderAsOfHint();renderSeg();if(!$("histTab").hidden)renderHist();
   const s=state[who];
   // Pay calendar (Current only): first time, stamp this period's union holidays
@@ -1302,6 +1302,7 @@ function starts(s){
         if(L1>=raw.sickE-0.05){const x=Math.max(0,r1(raw.sickE-Math.max(L0,40)));cS=x;o.sickE=r1(raw.sickE-x);}}}}
   if(o.vac!==null)o.vac=r1(raw.vac-cV+wkSum(s.pto,0)*vacX(s));
   if(o.sick!==null)o.sick=r1(raw.sick-cS+wkSum(s.sickD,0));
+  o.addV=cV;o.addS=cS; // week 1's credit is already on the page, so it can be used
   return o;
 }
 
@@ -1589,15 +1590,31 @@ $("copyCurH").onclick=()=>confirmTap($("copyCurH"),()=>{
 });
 // Vacation and sick you don't have yet: payroll only pays what's in your balance at the start of the pay period
 // (time you earn during the period can't be used until the next one). Warn on the day, before you take it.
+// What you can use = your timekeeping page balance − what you've used since that page date (same math as "Vacation now").
+// Credit is usable once it's awarded (contract 8.3(a)), and the page shows what's been awarded.
+function leaveLedger(p){
+  const isViz=p===state.tif, m=state.mel, src=isViz?p:m, blank=v=>String(v??"").trim()==="";
+  let lv=blank(src.vacBal)?null:Math.max(-999,num(src.vacBal,0)), ls=blank(src.sickBal)?null:Math.max(-999,num(src.sickBal,0));
+  if(lv===null&&ls===null)return null;
+  const pid=isViz?(CAL?CAL.id:null):(p===state.prev?PPID:(m.periodId||(CAL&&CAL.id)));if(!pid)return null;
+  const P0=(()=>{const [y,mo,d]=pid.split("-").map(Number);return dayN(new Date(y,mo-1,d));})();
+  // The day the page balance is from: the Friday after the page date (or the period start after a roll).
+  const A=isViz?P0:(()=>{const q=m.anch||m.periodId;if(!q)return P0;const [y,mo,d]=q.split("-").map(Number);return dayN(new Date(y,mo-1,d));})();
+  if(A>=P0+14)return null; // the page is newer than this whole period: nothing left to check
+  // Vacation/sick used between the page date and this period.
+  if(!isViz&&A<P0){const M=new Map(),put=(id,q)=>{if(!id||!q)return;const [y,mo,d]=id.split("-").map(Number),o=dayN(new Date(y,mo-1,d)),vx=vacX(q);for(let k=0;k<14;k++)M.set(o+kOff(k),[(+(q.pto||[])[k]||0)*vx,+(q.sickD||[])[k]||0]);};
+    (m.hist||[]).forEach(h=>put(h.pid,h.p));put(m.periodId,m);
+    for(let n=A;n<P0;n++){const u=M.get(n);if(u){if(lv!==null)lv=r1(lv-u[0]);if(ls!==null)ls=r1(ls-u[1]);}}}
+  const vx=vacX(p),out={availV:lv,availS:ls,overV:{},overS:{},cutV:0,cutS:0,days:[]};
+  for(let pos=0;pos<14;pos++){const w=pos<7?0:1,i=ORDER[pos%7],k=w*7+i;if(P0+pos<A)continue; // already in the page balance
+    const v=(+(p.pto||[])[k]||0)*vx,sk=+(p.sickD||[])[k]||0;
+    if(lv!==null&&v>0){const x=r1(Math.max(0,v-Math.max(0,lv))/vx);if(x>0){out.overV[k]=x;out.cutV=r1(out.cutV+x);out.days.push([k,"vacation",x]);}lv=r1(lv-v);}
+    if(ls!==null&&sk>0){const x=r1(Math.max(0,sk-Math.max(0,ls)));if(x>0){out.overS[k]=x;out.cutS=r1(out.cutS+x);out.days.push([k,"sick",x]);}ls=r1(ls-sk);}}
+  out.leftV=lv;out.leftS=ls;return out;}
 function leaveCheck(s){
   if(!(who==="mel"||who==="prev"||who==="tif")||!CAL)return null;
   if(who==="mel"&&(s.periodId||CAL.id)!==CAL.id)return null;
-  const s0=starts(s),vx=vacX(s),out={vac:s0.vac,sick:s0.sick,overV:{},overS:{},cutV:0,cutS:0,days:[]};
-  let lv=s0.vac,ls=s0.sick;
-  for(const w of [0,1])for(const i of ORDER){const k=w*7+i,v=(+(s.pto||[])[k]||0)*vx,sk=+(s.sickD||[])[k]||0;
-    if(lv!==null&&v>0){const x=r1(Math.max(0,v-Math.max(0,lv)));if(x>0){out.overV[k]=x;out.cutV=r1(out.cutV+x);out.days.push([k,"vacation",x]);}lv=r1(lv-v);}
-    if(ls!==null&&sk>0){const x=r1(Math.max(0,sk-Math.max(0,ls)));if(x>0){out.overS[k]=x;out.cutS=r1(out.cutS+x);out.days.push([k,"sick",x]);}ls=r1(ls-sk);}}
-  out.leftV=lv;out.leftS=ls;return out;}
+  const L=leaveLedger(s);if(!L)return null;L.vac=L.availV;L.sick=L.availS;return L;}
 function renderLeave(s){
   const el=$("leaveAv"),L=leaveCheck(s);
   DEF.forEach((_,k)=>{$("p"+k).classList.toggle("over",!!(L&&L.overV[k]));$("sk"+k).classList.toggle("over",!!(L&&L.overS[k]));});
@@ -1626,9 +1643,10 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=40;
+const NOTES_VERSION=41;
 const NOTES=[
-  'Year-to-date gross now says to use your latest paycheck'
+  'Vacation and sick warnings now use your timekeeping balance minus what you’ve used since',
+  'Typing vacation or sick lowers Regular instead of adding OT'
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}

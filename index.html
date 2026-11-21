@@ -575,7 +575,7 @@ td{font-weight:600}
 
 <script>
 const PEOPLE={
-  mel:{name:"Current",rate:45.02,k401:8.5,extra:150,loan:47.39,fs:"mfj",med:25.59,duesAmt:111.70,mnpl:7.51,ytd:""},
+  mel:{name:"Current",rate:"",k401:"",extra:0,loan:0,fs:"mfj",med:25.59,duesAmt:111.70,mnpl:7.51,ytd:""},
   tif:{name:"Visualize",rate:"",k401:"",extra:0,loan:0,fs:"mfj",med:25.59,duesAmt:111.70,mnpl:7.51,ytd:""}
 };
 const DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
@@ -625,6 +625,9 @@ const ORDER=[4,5,6,0,1,2,3];
 // "prev" = the last pay period, still waiting to be paid. It's a view of its History entry, shown like Current.
 let PCAL=null, PPID=null;
 const vcal=()=>who==="mel"?CAL:who==="prev"?PCAL:null;
+// Current is still showing last period's hours (new period started, not rolled yet): today's calendar isn't theirs.
+const stale=()=>who==="mel"&&!!CAL&&!!state.mel.periodId&&state.mel.periodId!==CAL.id;
+const hcal=()=>stale()?null:vcal();   // the calendar whose holidays belong to the hours on screen
 let selDay=null;
 [1,2].forEach(wk=>{
   const el=$("days"+wk), o=(wk-1)*7;
@@ -697,9 +700,10 @@ function calc(p,calOv){
   const legW=Math.max(0,+p.holw||0); holW+=legW; worked+=legW;
   const r=+p.rate||0;
   // Payroll only pays vacation and sick you have (Nov 12 stub: 15.6 vacation asked, 12.9 paid). The rest goes unpaid.
+  // Same check for Current, Visualize and any saved period, so a check reads the same on every screen.
   let vacCut=0,sickCut=0,vacAvail=null,sickAvail=null;
-  if(p===state.mel||p===state.prev||p===state.tif){try{const L=leaveLedger(p);
-    if(L){vacCut=L.cutV;sickCut=L.cutS;vacAvail=L.availV;sickAvail=L.availS;}}catch(e){}}
+  {let L=null;try{L=(p===state.mel||p===state.tif)?leaveLedger(p):cal?leaveLedger(p,cal.id):null;}catch(e){}
+    if(L){vacCut=L.cutV;sickCut=L.cutS;vacAvail=L.availV;sickAvail=L.availS;}}
   const stPay=(st+pto-vacCut-sickCut+leave+holH)*r, otPay=ot*r*1.5, dtPay=dt*r*2;
   const holPay=holW*r*2;
   const gross=stPay+otPay+dtPay+holPay;
@@ -783,7 +787,7 @@ function renderCal(s){
     const b=$("dn"+k), i=k%7, isToday=on&&C.dates[k]===C.todayYmd;
     if(on){const dd=+C.dates[k].slice(8);b.innerHTML=`${DAYS[i]}<small>${dd}</small>`;}else b.textContent=DAYS[i];
     b.classList.toggle("today",!!isToday); $("h"+k).classList.toggle("today",!!isToday); $("o"+k).classList.toggle("today",!!isToday);
-    const lock=!!(on&&HOLIDAYS.has(C.dates[k])), hb=$("hd"+k);
+    const lock=!!(on&&!stale()&&HOLIDAYS.has(C.dates[k])), hb=$("hd"+k);
     hb.disabled=lock; hb.classList.toggle("locked",lock); hb.title=lock?"Union holiday":"";
     if(i>=5){hb.disabled=true;hb.classList.remove("locked");hb.setAttribute("aria-pressed","false");hb.title="Weekend: normal weekend rates, no holiday pay";}
     if(lock)hb.setAttribute("aria-pressed","true");
@@ -979,8 +983,8 @@ function renderVac(s,c){
         [0,1].forEach(w=>{const cr=r1(wkWorked(ph.p,w)/div),r=wkSplit(se,cr,yEndAt(addD(VC.start,-7+7*w)));se=r.sickE;law=r1(law+r.lawX);if(w===1){w2S=r1(r.toS-r.lawX);w2V=r.toV;}});
         if(!posted(addD(VC.start,-1))){unS=w2S;unV=w2V;}
         if(lawPostN(addD(VC.start,-1))>tN)unS=r1(unS+law);}}
-    const vNow=st0.vac===null?null:r1(st0.vac-unV+[0,1].reduce((t,w)=>t+(done(w)?perV[w]:0),0)-usedTo(s.pto)*vx);
-    const sNow=st0.sick===null?null:r1(st0.sick-unS+[0,1].reduce((t,w)=>t+(done(w)?perS[w]-perSL[w]:0),0)-usedTo(s.sickD));
+    const vNow=st0.vac===null?null:Math.max(0,r1(st0.vac-unV+[0,1].reduce((t,w)=>t+(done(w)?perV[w]:0),0)-usedTo(s.pto)*vx));
+    const sNow=st0.sick===null?null:Math.max(0,r1(st0.sick-unS+[0,1].reduce((t,w)=>t+(done(w)?perS[w]-perSL[w]:0),0)-usedTo(s.sickD)));
     nowBox=`<div class="hbig hnow"><div><span>Vacation now</span><b>${vNow===null?"–":vNow}</b><small>today, ${mdy(new Date())}</small></div><div><span>Sick now</span><b>${sNow===null?"–":sNow}</b><small>today, ${mdy(new Date())}</small></div></div>`;}
   el.innerHTML=`<p class="vsrc">${src}</p>${nowBox}<div class="hbig"><div class="otw"><span>Vacation earned</span><b>${addV}</b><small>${sub}</small></div><div class="pto"><span>Sick leave earned</span><b>${addS}</b><small>${lawOn?"1 per 40 hrs worked":sick>=40?"40 done this year":`${r1(sick)} of 40 this year`}</small></div>`+
     `<div><span>Vacation ${endLbl}</span><b>${bal===null?"–":bal}</b><small>${bal===null?"add your balance above":endLine(viz?st0.vac:rawV,perV,s.pto,vx)}</small></div><div><span>Sick ${endLbl}</span><b>${sbal===null?"–":sbal}</b><small>${sbal===null?"add your balance above":endLine(viz?st0.sick:rawS,perS,s.sickD,1)}</small></div></div>`+
@@ -991,7 +995,11 @@ function renderVac(s,c){
 function stampHolidays(){if(!CAL)return;DEF.forEach((_,k)=>{if(HOLIDAYS.has(CAL.dates[k]))$("hd"+k).setAttribute("aria-pressed","true");});}
 // Day rules: no regular hours on Sat, Sun or holidays; regular is capped at 8 minus PTO.
 // Extra regular hours move to OT, so the day's total (and pay) never changes.
-function isHolDay(k){return $("hd"+k).getAttribute("aria-pressed")==="true"||!!(vcal()&&HOLIDAYS.has(vcal().dates[k]));}
+function isHolDay(k){return $("hd"+k).getAttribute("aria-pressed")==="true"||!!(hcal()&&HOLIDAYS.has(hcal().dates[k]));}
+// While you're typing in a Vacation or Sick box, remember that day's Regular hours from before, so lowering the
+// vacation gives them back (never more than you had).
+let ptoEdit=null;
+document.addEventListener("focusin",e=>{const m=/^(p|sk)(\d+)$/.exec((e.target&&e.target.id)||"");ptoEdit=m?{k:+m[2],reg:Math.max(0,+$("h"+m[2]).value||0)}:null;});
 function normalizeDays(){
   const moved=[];
   for(let k=0;k<14;k++){
@@ -999,6 +1007,7 @@ function normalizeDays(){
     const off=i>=5||isHolDay(k);
     let reg=Math.max(0,+hi.value||0), ot=Math.max(0,+oi.value||0), pto=Math.max(0,ptoIn(k));
     const cap=off?0:Math.max(0,8-pto);
+    if(!off&&ptoEdit&&ptoEdit.k===k&&reg<Math.min(ptoEdit.reg,cap)){reg=Math.min(ptoEdit.reg,cap);hi.value=reg;}  // vacation lowered: Regular comes back
     if(reg>cap){
       const x=+(reg-cap).toFixed(2), ae=document.activeElement, typing=!off&&ae===hi, ptoTyping=!off&&(ae===$("p"+k)||ae===$("sk"+k));
       if(typing){reg=cap;hi.value=reg;moved.push([k,x,off,true]);}          // typing in Regular: stop at the cap
@@ -1028,7 +1037,7 @@ function render(){renderQEnd();
     // so they don't shift when a new pay period starts. Same pay period: this week. Older period: its 2nd week.
     if(s.anch===undefined){const [y,m,d]=s.periodId.split("-").map(Number);s.anch=s.periodId===CAL.id?ymd(addD(CAL.start,7*weekIdx())):ymd(addD(new Date(y,m-1,d),7));}
     // Union holidays on the calendar are always marked on Current (locked on)
-    DEF.forEach((_,k)=>{if(HOLIDAYS.has(CAL.dates[k]))s.holD[k]=true;});
+    if(s.periodId===CAL.id)DEF.forEach((_,k)=>{if(HOLIDAYS.has(CAL.dates[k]))s.holD[k]=true;});
     addRollStub(s);
   }
   if(who==="prev"&&PCAL)DEF.forEach((_,k)=>{if(HOLIDAYS.has(PCAL.dates[k]))s.holD[k]=true;});
@@ -1154,7 +1163,7 @@ document.querySelectorAll(".hd").forEach(b=>b.addEventListener("click",()=>{
   const m=normalizeDays();render();if(on)flashGrid(m);
 }));
 document.querySelectorAll(".dn").forEach(b=>b.addEventListener("click",()=>{const k=+b.id.slice(2);selDay=selDay===k?null:k;render();}));
-$("copy").onclick=()=>confirmTap($("copy"),()=>{const hs=state[who].holStash||{};for(let i=0;i<7;i++){delete hs[i+7];$("h"+(i+7)).value=$("h"+i).value;$("o"+(i+7)).value=$("o"+i).value;$("p"+(i+7)).value=$("p"+i).value;$("sk"+(i+7)).value=$("sk"+i).value;$("hd"+(i+7)).setAttribute("aria-pressed",(who==="mel"&&CAL)?String(HOLIDAYS.has(CAL.dates[i+7])):$("hd"+i).getAttribute("aria-pressed"));} render();});
+$("copy").onclick=()=>confirmTap($("copy"),()=>{const hs=state[who].holStash||{};for(let i=0;i<7;i++){delete hs[i+7];$("h"+(i+7)).value=$("h"+i).value;$("o"+(i+7)).value=$("o"+i).value;$("p"+(i+7)).value=$("p"+i).value;$("sk"+(i+7)).value=$("sk"+i).value;$("hd"+(i+7)).setAttribute("aria-pressed",(who==="mel"&&CAL&&!stale())?String(HOLIDAYS.has(CAL.dates[i+7])):$("hd"+i).getAttribute("aria-pressed"));} render();});
 
 // Visualize presets: starters + the user's own, all editable. Stored with the Visualize profile.
 const STARTERS=[["40 hrs, no OT","40"],["10-hr weekdays","10"],["12-hr weekdays","12"],["10-hr + Saturday","10s"],["10-hr + Sat + Sun","10ss"]];
@@ -1230,7 +1239,7 @@ function closeDef(){defStage=0;$("defBox").hidden=true;}
 $("reset").onclick=()=>{
   const m=PEOPLE.mel;
   defStage=1; $("defStep").textContent="Step 1 of 2"; $("defTitle").textContent="Reset to default?";
-  $("defMsg").textContent=`This sets the ${(PEOPLE[who]||PEOPLE.mel).name} profile to the starting setup: $${m.rate.toFixed(2)}/hr, ${m.k401}% 401(k), $${m.extra} W-4 extra, $${m.loan} 401(k) loan, married jointly, and the standard deductions. Every day's hours, PTO and holidays go to 0. The other profile isn't changed.`;
+  $("defMsg").textContent=`This clears the ${(PEOPLE[who]||PEOPLE.mel).name} profile back to a blank setup: no rate, no 401(k), no W-4 extra, no 401(k) loan, married jointly, and the standard deductions. Every day's hours, PTO and holidays go to 0. The other profile isn't changed.`;
   $("defGo").textContent="Continue"; $("defBox").hidden=false; try{$("defCancel").focus();}catch(e){}
 };
 $("defGo").onclick=()=>{
@@ -1268,7 +1277,7 @@ const pageAnch=()=>ymd(addD(pageAsOf(),1));   // the Friday after the page's dat
 // Where the copied numbers start, in weeks from this pay period's first day: -1 = last week of the previous period, 0, or 1.
 function anchOff(s){if(s!==state.mel||!CAL)return 0;const a=s.anch||pageAnch(),pid=s.periodId||CAL.id,[y,m,d]=pid.split("-").map(Number),[ay,am,ad]=a.split("-").map(Number);return Math.round((dayN(new Date(ay,am-1,ad))-dayN(new Date(y,m-1,d)))/7);}
 function asOfWk1(s){return anchOff(s)===1;}
-["q160h","vacBal","sickBal","sickE","consW"].forEach(id=>$(id).addEventListener("input",()=>{if(who!=="mel"||!CAL||(state.mel.periodId||CAL.id)!==CAL.id)return;state.mel.anch=pageAnch();state.mel.cpd=ymd(new Date());render();}));
+["q160h","vacBal","sickBal","sickE","consW"].forEach(id=>$(id).addEventListener("input",()=>{if(who!=="mel"||!CAL||(state.mel.periodId||CAL.id)!==CAL.id)return;state.mel.anch=pageAnch();state.mel.cpd=state.mel.cpl=ymd(new Date());render();}));
 function wkOT(s,w){let t=0;for(const i of ORDER){const k=w*7+i,d=dayPay(i,(+s.hours[k]||0)+(+(s.otD||[])[k]||0),ptoAt(s,k),(s.holD||[])[k]);t+=d.ot+d.dt+d.holW;}return r1(t);}
 function wkWorked(s,w){let t=0;for(let k=w*7;k<w*7+7;k++)t+=paidHrs(s,k);return t;}
 function wkSum(a,w){let t=0;for(let k=w*7;k<w*7+7;k++)t+=+(a||[])[k]||0;return t;}
@@ -1324,7 +1333,14 @@ function renderSeg(){
 // Edits made in the pending view: recalc that check and carry the change forward to today's numbers.
 // The pending check always uses your Current setup (rate, 401(k), W-4, 3rd shift…), so a change there shows up here too.
 const PAY_KEYS=["shift3","rate","k401","k401r","k401a","extra","loan","fs","med","duesAmt","mnpl","ytd","credit","oPre","oPost","espp","step2","senDate"];
-function prevSync(){const H=state.mel.hist||[],i=H.findIndex(x=>x.pid===PPID);if(i<0)return;const P=H[i].p;if(P)PAY_KEYS.forEach(k=>{P[k]=state.mel[k];});saveHistEdit(i,{},true);}
+const hrsSig=q=>JSON.stringify([q.hours||[],q.otD||[],q.pto||[],q.sickD||[],(q.holD||[]).map(Boolean)]);
+function prevSync(){const H=state.mel.hist||[],i=H.findIndex(x=>x.pid===PPID);if(i<0)return;const h=H[i],P=h.p;if(P)PAY_KEYS.forEach(k=>{P[k]=state.mel[k];});
+  // The grid edits this check's hours in place. To carry a change into today's numbers, figure the check with the
+  // hours it had last time (h.sig), then with the new ones.
+  if(P&&!h.fill&&h.sig&&h.sig!==hrsSig(P)){let old=null;try{old=JSON.parse(h.sig);}catch(e){}
+    if(old){const now={hours:P.hours.slice(),otD:(P.otD||[]).slice(),pto:(P.pto||[]).slice(),sickD:(P.sickD||[]).slice(),holD:(P.holD||[]).slice()};
+      Object.assign(P,{hours:old[0],otD:old[1],pto:old[2],sickD:old[3],holD:old[4]});saveHistEdit(i,now,true);return;}}
+  saveHistEdit(i,{},true);}
 $("segPrev").onclick=()=>{if(who==="prev")return;const pi=pendingInfo();if(!pi)return;read();
   const s=state.mel;if(!(s.hist||[]).some(h=>h.pid===pi.pid)){const n=addPastEntry(pi.pid,{hours:Array(14).fill(0),otD:Array(14).fill(0),pto:Array(14).fill(0),sickD:Array(14).fill(0),holD:Array(14).fill(false)},true);n.fill=true;}
   const h=s.hist.find(x=>x.pid===pi.pid); if(!h.p){const i=s.hist.indexOf(h);legacyInit(i,{hours:Array(14).fill(0),otD:Array(14).fill(0),pto:Array(14).fill(0),sickD:Array(14).fill(0),holD:Array(14).fill(false)});s.hist[i].fill=true;}
@@ -1356,8 +1372,9 @@ function snapPeriod(){
   const [y,m,d]=s.periodId.split("-").map(Number), st=starts(s);
   // Keep the period's own hours and settings so it can be edited and recalculated later.
   const pr=JSON.parse(JSON.stringify(s)); ["hist","myPresets","holStash","qRoll","lRoll","anch"].forEach(k=>delete pr[k]);
+  pr.lv={a:s.anch||null,v:s.vacBal??"",s:s.sickBal??""};   // page balances in effect during this period (for the unpaid-leave check)
   pr.q160h=String(st.q); pr.sickE=String(st.sickE); pr.vacBal=st.vac===null?"":String(st.vac); pr.sickBal=st.sick===null?"":String(st.sick);
-  const e=histFigures(pr,new Date(y,m-1,d)); e.pid=s.periodId; e.p=pr; e.st=st;
+  const e=histFigures(pr,new Date(y,m-1,d)); e.pid=s.periodId; e.p=pr; e.st=st; e.sig=hrsSig(pr);
   const H=(s.hist||(s.hist=[])).filter(x=>x.pid!==e.pid); H.unshift(e); s.hist=H.slice(0,26);
 }
 // Pay and leave for one saved period, from its own hours and starting numbers.
@@ -1452,17 +1469,23 @@ function saveHistEdit(i,vals,quiet){
   // Before/after from the same math, so a rule change in the app never shows up as an edit.
   const o=histFigures(h.p,os); Object.assign(h.p,vals); const n=histFigures(h.p,os);
   const dQ=r1(n.qEnd-o.qEnd), dV=(n.vacEnd!=null&&o.vacEnd!=null)?r1(n.vacEnd-o.vacEnd):0, dS=(n.sickEnd!=null&&o.sickEnd!=null)?r1(n.sickEnd-o.sickEnd):0, dE=r1(n.sickEEnd-o.sickEEnd);
-  const keep={pid:h.pid,p:h.p,st:h.st}; H[i]=Object.assign(keep,n);
+  const keep={pid:h.pid,p:h.p,st:h.st,sig:hrsSig(h.p)}; H[i]=Object.assign(keep,n);
   const endN=dayN(addD(os,13)), qBreak=toN=>QENDS.some(q=>{const [a,b,c]=q.split("-").map(Number),x=dayN(new Date(a,b-1,c));return x>=endN&&x<toN;});
   for(let j=i-1;j>=0;j--){const L=H[j],[ly,lm,ld]=L.pid.split("-").map(Number),lN=dayN(new Date(ly,lm-1,ld));const qOk=!qBreak(lN);
     if(L.p){if(qOk)L.p.q160h=String(r1(num(L.p.q160h,0)+dQ));if(L.p.vacBal!=="")L.p.vacBal=String(r1(num(L.p.vacBal,0)+dV));if(L.p.sickBal!=="")L.p.sickBal=String(r1(num(L.p.sickBal,0)+dS));L.p.sickE=String(r1(num(L.p.sickE,0)+dE));
       H[j]=Object.assign({pid:L.pid,p:L.p,st:L.st},histFigures(L.p,new Date(ly,lm-1,ld)));}
     else{if(qOk&&L.qEnd!=null)L.qEnd=r1(L.qEnd+dQ);if(L.vacEnd!=null)L.vacEnd=r1(L.vacEnd+dV);if(L.sickEnd!=null)L.sickEnd=r1(L.sickEnd+dS);}}
-  if(CAL&&!qBreak(dayN(CAL.start))&&dQ)s.q160h=String(r1(num(s.q160h,0)+dQ));
-  if(dV&&s.vacBal!==""&&s.vacBal!=null)s.vacBal=String(r1(num(s.vacBal,0)+dV));
-  if(dS&&s.sickBal!==""&&s.sickBal!=null)s.sickBal=String(r1(num(s.sickBal,0)+dS));
-  if(dE)s.sickE=String(r1(num(s.sickE,0)+dE));
-  if(!quiet){write(); save(); render();} return {dQ,dV,dS};
+  // Today's numbers move only if they came from the app's own roll-forward. Numbers you copied from the
+  // timekeeping page this period are the real ones, so they stay.
+  const live=!s.cpd;
+  if(live){
+    if(CAL&&!qBreak(dayN(CAL.start))&&dQ)s.q160h=String(r1(num(s.q160h,0)+dQ));
+    if(dV&&s.vacBal!==""&&s.vacBal!=null)s.vacBal=String(Math.max(0,r1(num(s.vacBal,0)+dV)));
+    if(dS&&s.sickBal!==""&&s.sickBal!=null)s.sickBal=String(Math.max(0,r1(num(s.sickBal,0)+dS)));
+    if(dE)s.sickE=String(Math.max(0,r1(num(s.sickE,0)+dE)));
+    if(s.qRoll&&dQ&&s.qRoll.val!=null)s.qRoll.val=num(s.q160h,0);   // keep the "updated by itself" note in step
+  }
+  if(!quiet){write(); save(); render();} return live?{dQ,dV,dS}:{dQ:0,dV:0,dS:0,held:!!(dQ||dV||dS)};
 }
 function renderHist(){
   const L=state.mel.hist||[], el=$("histList"); el.textContent="";
@@ -1501,7 +1524,7 @@ function renderHist(){
         if(!h.p||h.fill){if(!h.p)legacyInit(i,vals);else saveHistEdit(i,vals,true);const nh=state.mel.hist[i];nh.fill=true;save();nh._open=true;nh._msg=`Saved. Take-home for this period: ${money(nh.net)}. Today's quarter OT and PTO already had these hours, so they didn't change.`;renderHist();return;}
         const old=h.net,r=saveHistEdit(i,vals),nh=state.mel.hist[i],bits=[];
         bits.push(`Take-home ${money(old)} → ${money(nh.net)}`); if(r.dQ)bits.push(`quarter OT ${r.dQ>0?"+":""}${r.dQ}`); if(r.dV)bits.push(`vacation ${r.dV>0?"+":""}${r.dV}`); if(r.dS)bits.push(`sick ${r.dS>0?"+":""}${r.dS}`);
-        nh._open=true; nh._msg=`Saved. ${bits.join(" · ")}${(r.dQ||r.dV||r.dS)?". Later periods and today's numbers were updated too.":"."}`; renderHist();};
+        nh._open=true; nh._msg=`Saved. ${bits.join(" · ")}${(r.dQ||r.dV||r.dS)?". Later periods and today's numbers were updated too.":r.held?". Today's numbers are from your timekeeping page, so they stayed put.":"."}`; renderHist();};
     });
     box.appendChild(dt);});
   el.appendChild(box);
@@ -1524,8 +1547,8 @@ function rollLeave(){
     if(aOff!==null&&!reset){sickE=0;reset=true;}
     s.sickE=String(sickE); $("sickE").value=sickE;
   }
-  if(st0.vac!==null){s.vacBal=String(r1(st0.vac+toV-vacUsed));$("vacBal").value=s.vacBal;}
-  if(st0.sick!==null){s.sickBal=String(r1(st0.sick+toS-sickUsed));$("sickBal").value=s.sickBal;}
+  if(st0.vac!==null){s.vacBal=String(Math.max(0,r1(st0.vac+toV-vacUsed)));$("vacBal").value=s.vacBal;}
+  if(st0.sick!==null){s.sickBal=String(Math.max(0,r1(st0.sick+toS-sickUsed)));$("sickBal").value=s.sickBal;}
   s.lRoll={to:CAL.id,from:s.periodId,toV,toS,vacUsed,sickUsed,reset};
 }
 // Current: roll "Quarter OT before this pay period" forward when a new pay period starts.
@@ -1588,22 +1611,28 @@ $("copyCurH").onclick=()=>confirmTap($("copyCurH"),()=>{
   }
   state.tif.holStash={}; selDay=null; render();
 });
-// Vacation and sick you don't have yet: payroll only pays what's in your balance at the start of the pay period
-// (time you earn during the period can't be used until the next one). Warn on the day, before you take it.
+// Vacation and sick you don't have: payroll only pays what's in your balance (Nov 12 stub: 15.6 vacation asked, 12.9 paid).
 // What you can use = your timekeeping page balance − what you've used since that page date (same math as "Vacation now").
 // Credit is usable once it's awarded (contract 8.3(a)), and the page shows what's been awarded.
-function leaveLedger(p){
-  const isViz=p===state.tif, m=state.mel, src=isViz?p:m, blank=v=>String(v??"").trim()==="";
-  let lv=blank(src.vacBal)?null:Math.max(-999,num(src.vacBal,0)), ls=blank(src.sickBal)?null:Math.max(-999,num(src.sickBal,0));
+// p = the hours being checked; pid = their pay period when p is a saved (History / Pending) period.
+function leaveLedger(p,pidIn){
+  const isViz=p===state.tif, m=state.mel, isCur=p===m, blank=v=>String(v??"").trim()==="", dN=q=>{const [y,mo,d]=q.split("-").map(Number);return dayN(new Date(y,mo-1,d));};
+  const pid=isViz?(CAL?CAL.id:null):isCur?(m.periodId||(CAL&&CAL.id)):(pidIn||(p===state.prev?PPID:null)); if(!pid)return null;
+  const P0=dN(pid);
+  // Which page numbers apply. Current: the ones typed in. A saved period: the ones typed in if that page is from
+  // inside the period; otherwise the ones that were in effect when the period was saved (kept in p.lv).
+  let src=isViz?p:m, A=P0;
+  if(!isViz){const q=m.anch||m.periodId, AL=q?dN(q):P0;
+    if(isCur)A=AL;
+    else if(AL>P0&&AL<P0+14)A=AL;
+    else if(p.lv){src={vacBal:p.lv.v,sickBal:p.lv.s};A=p.lv.a?dN(p.lv.a):P0;}
+    else return null;}
+  let lv=blank(src.vacBal)?null:num(src.vacBal,0), ls=blank(src.sickBal)?null:num(src.sickBal,0);
   if(lv===null&&ls===null)return null;
-  const pid=isViz?(CAL?CAL.id:null):(p===state.prev?PPID:(m.periodId||(CAL&&CAL.id)));if(!pid)return null;
-  const P0=(()=>{const [y,mo,d]=pid.split("-").map(Number);return dayN(new Date(y,mo-1,d));})();
-  // The day the page balance is from: the Friday after the page date (or the period start after a roll).
-  const A=isViz?P0:(()=>{const q=m.anch||m.periodId;if(!q)return P0;const [y,mo,d]=q.split("-").map(Number);return dayN(new Date(y,mo-1,d));})();
   if(A>=P0+14)return null; // the page is newer than this whole period: nothing left to check
   // Vacation/sick used between the page date and this period.
-  if(!isViz&&A<P0){const M=new Map(),put=(id,q)=>{if(!id||!q)return;const [y,mo,d]=id.split("-").map(Number),o=dayN(new Date(y,mo-1,d)),vx=vacX(q);for(let k=0;k<14;k++)M.set(o+kOff(k),[(+(q.pto||[])[k]||0)*vx,+(q.sickD||[])[k]||0]);};
-    (m.hist||[]).forEach(h=>put(h.pid,h.p));put(m.periodId,m);
+  if(!isViz&&A<P0){const M=new Map(),put=(id,q)=>{if(!id||!q)return;const o=dN(id),vx=vacX(q);for(let k=0;k<14;k++)M.set(o+kOff(k),[(+(q.pto||[])[k]||0)*vx,+(q.sickD||[])[k]||0]);};
+    (m.hist||[]).forEach(h=>put(h.pid,h.p));if(m.periodId&&dN(m.periodId)<P0)put(m.periodId,m);
     for(let n=A;n<P0;n++){const u=M.get(n);if(u){if(lv!==null)lv=r1(lv-u[0]);if(ls!==null)ls=r1(ls-u[1]);}}}
   const vx=vacX(p),out={availV:lv,availS:ls,overV:{},overS:{},cutV:0,cutS:0,days:[]};
   for(let pos=0;pos<14;pos++){const w=pos<7?0:1,i=ORDER[pos%7],k=w*7+i;if(P0+pos<A)continue; // already in the page balance
@@ -1614,15 +1643,15 @@ function leaveLedger(p){
 function leaveCheck(s){
   if(!(who==="mel"||who==="prev"||who==="tif")||!CAL)return null;
   if(who==="mel"&&(s.periodId||CAL.id)!==CAL.id)return null;
-  const L=leaveLedger(s);if(!L)return null;L.vac=L.availV;L.sick=L.availS;return L;}
+  const L=who==="prev"?leaveLedger(s,PPID):leaveLedger(s);if(!L)return null;L.vac=L.availV;L.sick=L.availS;return L;}
 function renderLeave(s){
   const el=$("leaveAv"),L=leaveCheck(s);
   DEF.forEach((_,k)=>{$("p"+k).classList.toggle("over",!!(L&&L.overV[k]));$("sk"+k).classList.toggle("over",!!(L&&L.overS[k]));});
-  if(!L||(L.vac===null&&L.sick===null)){el.hidden=true;return;}
+  if(!L||(L.vac===null&&L.sick===null)||(who==="prev"&&!L.days.length)){el.hidden=true;return;}
   const dn=k=>{const VC=vcal();if(!VC)return ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][k%7]+` (week ${k<7?1:2})`;const [y,m,d]=VC.dates[k].split("-").map(Number);return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(y,m-1,d).getDay()]+" "+m+"/"+d;};
-  let h=`<span>Left to use this pay period: ${L.vac===null?"":`<b>${r1(Math.max(0,L.leftV))}</b> vacation`}${L.vac!==null&&L.sick!==null?" · ":""}${L.sick===null?"":`<b>${r1(Math.max(0,L.leftS))}</b> sick`}</span>`;
+  let h=who==="prev"?"":`<span>Left to use this pay period: ${L.vac===null?"":`<b>${r1(Math.max(0,L.leftV))}</b> vacation`}${L.vac!==null&&L.sick!==null?" · ":""}${L.sick===null?"":`<b>${r1(Math.max(0,L.leftS))}</b> sick`}</span>`;
   L.days.forEach(([k,t,x])=>{h+=`<span class="lw">${dn(k)}: ${x} hrs ${t} won't be paid. You don't have it yet.</span>`;});
-  if(who==="mel"){const c=s.cpd||s.anch;if(c){const [y,m,d]=c.split("-").map(Number),age=dayN(new Date())-dayN(new Date(y,m-1,d));
+  if(who==="mel"){const c=s.cpl;if(c){const [y,m,d]=c.split("-").map(Number),age=dayN(new Date())-dayN(new Date(y,m-1,d));
     if(age>14)h+=`<span class="ls">Your balances were copied ${age} days ago. Copy your timekeeping page again so these stay right.</span>`;}}
   el.innerHTML=h;el.hidden=false;}
 // Seniority date becomes years of seniority, since that's what Visualize uses.
@@ -1634,19 +1663,66 @@ $("copyCur").onclick=()=>confirmTap($("copyCur"),copySetup);
 $("copyCurVac").onclick=()=>confirmTap($("copyCurVac"),copySetup);
 $("tabPay").onclick=()=>showTab("pay"); $("tabHrs").onclick=()=>showTab("hrs"); $("tabVac").onclick=()=>showTab("vac"); $("tabHist").onclick=()=>showTab("hist");
 [["senM","senD",2],["senD","senY",2]].forEach(([a,b,n])=>$(a).addEventListener("input",()=>{if($(a).value.replace(/\D/g,"").length>=n)$(b).focus();}));
-$("hDay").addEventListener("change",()=>{const k=+$("hDay").value;$("hHol").checked=vcal()?HOLIDAYS.has(vcal().dates[k]):$("hd"+k).getAttribute("aria-pressed")==="true";$("hMsg").textContent="";render();});
+$("hDay").addEventListener("change",()=>{const k=+$("hDay").value;$("hHol").checked=hcal()?HOLIDAYS.has(hcal().dates[k]):$("hd"+k).getAttribute("aria-pressed")==="true";$("hMsg").textContent="";render();});
 $("hAdd").onclick=()=>{const s=state[who],h=hoursCalc(s);if(!h)return;{const rg=+h.d.st.toFixed(1);$("h"+h.k).value=rg;$("o"+h.k).value=+(h.w-rg).toFixed(1)||"";}$("p"+h.k).value=h.p||"";$("hd"+h.k).setAttribute("aria-pressed",h.hol);selDay=h.k;render();$("hMsg").textContent=`Put on ${dayLabel(h.k)}: ${h.w} hrs worked${h.p?`, ${h.p} PTO`:""}${h.hol?", holiday":""}. Switch to Paycheck to see your check.`;};
-$("npKeep").onclick=()=>{read();snapPeriod();rollLeave();rollQuarter();addEnds();state.mel.anch=CAL.id;delete state.mel.cpd;state.mel.periodId=CAL.id;render();};
+$("npKeep").onclick=()=>{read();snapPeriod();rollLeave();rollQuarter();addEnds();state.mel.anch=CAL.id;delete state.mel.cpd;state.mel.periodId=CAL.id;
+  // Kept hours don't belong on this period's holidays: those days start empty. Add hours there only if you work them.
+  // And last period's holiday marks don't carry over: a day that was a holiday then is a normal day now.
+  const cl=[];DEF.forEach((_,k)=>{if(k%7>=5)return;const hb=$("hd"+k);
+    if(HOLIDAYS.has(CAL.dates[k])){if((+$("h"+k).value||0)+(+$("o"+k).value||0)+ptoIn(k)>0)cl.push(k);$("h"+k).value=0;$("o"+k).value="";$("p"+k).value="";$("sk"+k).value="";}
+    else if(hb.getAttribute("aria-pressed")==="true"){hb.setAttribute("aria-pressed","false");const tot=(+$("h"+k).value||0)+(+$("o"+k).value||0),reg=Math.min(tot,Math.max(0,8-ptoIn(k)));$("h"+k).disabled=false;$("h"+k).value=+reg.toFixed(2);$("o"+k).value=+(tot-reg).toFixed(2)||"";}});
+  if(state.mel.holStash)state.mel.holStash={};
+  render();
+  if(cl.length){$("gridMsg").textContent=`${cl.map(k=>dayLabel(k)).join(" and ")}: holiday, so the kept hours were cleared. Add hours there only if you work it.`;clearTimeout(gridMsgT);gridMsgT=setTimeout(()=>{$("gridMsg").textContent="";},9000);}};
+// One-time repair for anyone who opened the app Nov 20 or later on v41 or older: the new period's holidays
+// (Thanksgiving) were stamped onto the period that had just ended. Signature: a day marked holiday that isn't one
+// on its own calendar but is one, same weekday slot, in the period right after it.
+function fixHolBleed(){
+  const m=state.mel; if(m.holFix42||!CAL)return; m.holFix42=true;
+  const fix=(q,pid)=>{if(!q||!pid||!Array.isArray(q.holD)||!Array.isArray(q.hours))return null;
+    const [y,mo,d]=pid.split("-").map(Number),os=new Date(y,mo-1,d),own=calFor(os).dates,nxt=calFor(addD(os,14)).dates;let v=null;
+    for(let k=0;k<14;k++){if(k%7<5&&q.holD[k]&&!HOLIDAYS.has(own[k])&&HOLIDAYS.has(nxt[k])){
+      if(!v)v={hours:q.hours.slice(),otD:(q.otD||Array(14).fill(0)).slice(),holD:q.holD.slice()};
+      const tot=(+q.hours[k]||0)+(+(q.otD||[])[k]||0),reg=Math.min(tot,Math.max(0,8-ptoAt(q,k)));
+      v.holD[k]=false;v.hours[k]=+reg.toFixed(2);v.otD[k]=+(tot-reg).toFixed(2);}}
+    return v;};
+  try{
+    // Saved periods, oldest first. If you've copied fresh numbers since, those are the truth: only the saved check changes.
+    const H=m.hist||[];
+    for(let i=H.length-1;i>=0;i--){const h=H[i],v=fix(h.p,h.pid);if(!v)continue;
+      saveHistEdit(i,v,true);}
+    // Hours still waiting on "Start new period / Keep hours"
+    if(m.periodId&&m.periodId!==CAL.id){const v=fix(m,m.periodId);if(v)Object.assign(m,v);}
+    // Fixed the hours by hand in Pending already? Then the saved check is right but the numbers rolled into this
+    // period still carry the fake holiday hours. If they haven't been touched since the roll, line them up with the check.
+    const prevId=ymd(addD(CAL.start,-14)),h=H.find(x=>x.pid===prevId),own=calFor(addD(CAL.start,-14)).dates;
+    // "Keep hours" on the old version: the kept hours sat on this period's holidays as holiday work at 2×.
+    // If a holiday still holds exactly last period's hours for that weekday, it's the kept copy, not a plan to work: clear it.
+    if(h&&h.p&&m.periodId===CAL.id&&m.qRoll&&m.qRoll.to===CAL.id)DEF.forEach((_,k)=>{if(k%7<5&&HOLIDAYS.has(CAL.dates[k])&&!HOLIDAYS.has(own[k])){
+      const was=(+h.p.hours[k]||0)+(+(h.p.otD||[])[k]||0),ot=+(m.otD||[])[k]||0;
+      if(was>0&&!(+m.hours[k]||0)&&Math.abs(ot-was)<0.01&&!ptoAt(m,k)){m.otD[k]=0;}}});
+    if(h&&h.p&&!h.fill&&m.periodId===CAL.id&&!m.cpd&&DEF.some((_,k)=>k%7<5&&HOLIDAYS.has(CAL.dates[k])&&!HOLIDAYS.has(own[k]))){
+      const os=addD(CAL.start,-14),f=histFigures(h.p,os),endN=dayN(os)+13,qr=m.qRoll,lr=m.lRoll;
+      const qEdge=QENDS.some(q=>{const [a,b,c]=q.split("-").map(Number),x=dayN(new Date(a,b-1,c));return x>=endN&&x<dayN(CAL.start);});
+      if(qr&&qr.to===CAL.id&&qr.from===prevId&&!qEdge&&String(m.q160h)===String(qr.val)&&r1(f.qEnd)!==num(m.q160h,0)){qr.add=r1(qr.add+f.qEnd-num(m.q160h,0));m.q160h=String(r1(f.qEnd));qr.val=num(m.q160h,0);}
+      if(lr&&lr.to===CAL.id&&lr.from===prevId){
+        if(f.vacEnd!=null&&m.vacBal!==""&&m.vacBal!=null)m.vacBal=String(Math.max(0,f.vacEnd));
+        if(f.sickEnd!=null&&m.sickBal!==""&&m.sickBal!=null)m.sickBal=String(Math.max(0,f.sickEnd));
+        m.sickE=String(f.sickEEnd);lr.toV=f.vacEarned??lr.toV;lr.toS=f.sickEarned??lr.toS;}
+      Object.assign(h,f,{pid:h.pid,p:h.p,st:h.st,sig:hrsSig(h.p)});}
+  }catch(e){}
+}
 // Keep the calendar on today's date: recheck every minute and whenever the app comes back to the screen
 function tick(){const t=new Date(),c=calFor(t);const changed=!CAL||c.todayYmd!==CAL.todayYmd;CAL=c;if(changed)render();}
 setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=41;
+const NOTES_VERSION=42;
 const NOTES=[
-  'Vacation and sick warnings now use your timekeeping balance minus what you’ve used since',
-  'Typing vacation or sick lowers Regular instead of adding OT'
+  'Fixed: a new pay period with a holiday in it could add holiday pay to the period that just ended. If yours was hit, it has been corrected',
+  'Keep hours now leaves holidays empty. Add hours there only if you work them',
+  'Hours you change on the Pending check update quarter OT and PTO again'
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}
@@ -1668,6 +1744,10 @@ CAL=calFor(new Date());
   check(); document.addEventListener("visibilitychange",check); window.addEventListener("pageshow",check);
 })();
 load();
+// Brand-new user: the sample hours shouldn't sit on a holiday.
+if(state.mel.periodId===undefined&&CAL)DEF.forEach((_,k)=>{if(k%7<5&&HOLIDAYS.has(CAL.dates[k]))state.mel.hours[k]=0;});
+fixHolBleed();
+{const m=state.mel;if(!m.cpl){if(m.cpd)m.cpl=m.cpd;else if(m.anch&&m.anch!==m.periodId)m.cpl=m.anch;}}   // last time real numbers were copied in (best guess for older saves)
 syncToggle();renderMine();
 write(); render();
 let notesShown=false;

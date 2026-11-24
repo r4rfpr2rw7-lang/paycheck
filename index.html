@@ -62,6 +62,8 @@ h1{font-family:var(--f-display);font-weight:800;font-size:38px;line-height:.95;l
 input[type=number],input[type=text],select{font:500 16px var(--f-num);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-bottom:1.5px solid var(--muted);border-radius:2px;padding:8px;width:100%}
 input:focus-visible,select:focus-visible,button:focus-visible,[role=button]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .days.nosick .sickc{display:none}
+.days.nolw .lwc{display:none}
+.togs{display:flex;gap:14px;flex-wrap:wrap}
 .qafter{margin:-4px 0 10px;padding:10px 12px;border:2px solid var(--line);border-radius:12px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:15px}
 .qafter[hidden]{display:none}
 .qafter b{font-size:20px;white-space:nowrap}
@@ -108,7 +110,16 @@ input.ro{opacity:.7;border-style:dashed}
 .perseg button[aria-selected="true"]{background:var(--plate);color:var(--on-plate);box-shadow:inset 0 0 0 2px var(--edge)}
 .sicktog{background:none;border:0;color:var(--accent);font:700 13px var(--f-body);text-decoration:underline;cursor:pointer;padding:2px 0 8px;display:block}
 .sicktog[hidden]{display:none}
-.days{display:grid;grid-template-columns:58px repeat(7,minmax(0,1fr));gap:5px 5px;margin-bottom:6px;align-items:center}
+.days{display:grid;grid-template-columns:52px repeat(7,minmax(0,1fr)) minmax(0,1.2fr);gap:5px 3px;margin-bottom:6px;align-items:center}
+.days input,.days input.pto{font-size:15px;padding:7px 0!important;letter-spacing:-.04em;border-width:2px}
+.days .rl{font-size:11px}
+.days .dn{font-size:12px}
+@media (max-width:400px){.days{margin-left:-14px;margin-right:-14px;grid-template-columns:47px repeat(7,minmax(0,1fr)) minmax(0,1.12fr)}.days .rl{font-size:10px;letter-spacing:-.05em}.days .dn small{font-size:11.5px}.days .tc,.days .sv{font-size:12px;letter-spacing:-.03em}}
+.days .tc{font:700 13px var(--f-num);text-align:center;color:var(--ink)}
+.days .tch{font:700 12px var(--f-body);font-stretch:85%}
+.days .sv{font:600 13px var(--f-num);text-align:center;padding:6px 0;border-radius:6px;background:color-mix(in srgb,var(--accent) 14%,transparent);min-height:1em}
+.days .sv.tot{background:color-mix(in srgb,var(--accent) 26%,transparent);font-weight:800}
+.days .rs{color:var(--ink)}
 .days .rl{font:600 11.5px var(--f-body);font-stretch:85%;color:var(--muted)}
 .days .dn{font:700 13px var(--f-body);font-stretch:85%;letter-spacing:0;color:var(--ink);background:none;border:0;border-bottom:2px solid transparent;padding:2px 0;cursor:pointer;text-align:center}
 .days .dn.we{color:var(--warn)}
@@ -211,6 +222,8 @@ tr.tot td{border-bottom:0;border-top:2px solid var(--ink);font-weight:700;paddin
 .hres .hyr{margin-top:10px}
 .leavew{margin:10px 0 4px;font-size:.92em;line-height:1.45}
 .leavew b{font-family:var(--f-num)}
+.lwlab{margin-top:18px}
+#lwRes .lwl{margin:6px 0}#lwRes .lwl b{font-family:var(--f-num)}#lwRes .bad{color:#c0392b;font-weight:600}
 .leavew .lw{display:block;color:#c0392b;font-weight:600}
 .leavew .ls{display:block;opacity:.75}
 input.over{border-color:#c0392b!important;box-shadow:0 0 0 2px rgba(192,57,43,.25)}
@@ -345,6 +358,30 @@ td{font-weight:600}
 :root.viz[data-theme="dark"]{--bg:#1a1433;--panel:#271f4a;--line:#4a3d7d;--edge:#b9a2f0;--shadow-c:#0b0820;--muted:#d0c4f2;--accent:#d7b4ff;--accent-soft:#3a2d66;--plate:#f2bfe9;--on-plate:#2a1f45;--warn:#ff8fb8}
 :root.viz[data-theme="dark"] body{background:radial-gradient(60% 40% at 10% 0%,rgba(255,140,210,.22) 0%,transparent 70%),radial-gradient(55% 40% at 95% 25%,rgba(120,160,255,.22) 0%,transparent 70%),radial-gradient(60% 45% at 50% 100%,rgba(170,120,255,.25) 0%,transparent 70%),var(--bg);background-attachment:fixed}
 @media (max-width:440px){.tabs{gap:5px}.tabs button{padding:6px 8px;font-size:12.5px;box-shadow:2px 2px 0 var(--shadow-c)}}
+/* Timesheet grid: laid out like the timekeeping page. Thin lines, blanks for 0, shaded subtotal, mint total. */
+.days{gap:0!important;align-items:stretch;margin-bottom:12px}
+.days>span{display:flex;align-items:center;justify-content:center;min-height:36px;border-bottom:1px solid var(--line)}
+.days>input,.days>span.sv,.days>span.tc{border-left:1px solid var(--line)!important}
+.days .rl{justify-content:flex-start!important;padding-left:2px}
+.days .hdr,.days .dh{border-bottom:2px solid var(--ink)!important}
+.days .dh{flex-direction:column;justify-content:flex-end!important;padding:0 0 5px;gap:3px}
+.days .dh .dn{width:100%;padding:2px 0 1px;border-bottom:0}
+.days .dh .hd{width:auto;min-width:22px;font:900 10px var(--f-body);letter-spacing:0;padding:2px 5px;border:1.5px solid var(--line);border-radius:5px;box-shadow:none;background:transparent;color:var(--muted)}
+.days .dh .hd[aria-pressed="true"]{background:var(--warn);border-color:var(--warn);color:#fff}
+.days .dh .hd.locked{opacity:1}
+.days .dh.we .hd{visibility:hidden}
+.days input,.days input.pto{border:0!important;border-left:1px solid var(--line)!important;border-bottom:1px solid var(--line)!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;height:36px;min-width:0;width:100%;padding:0!important;font:700 16px var(--f-num);letter-spacing:-.03em;color:var(--ink)}
+.days input:disabled{background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--line) 55%,transparent) 0 4px,transparent 4px 8px)!important}
+.days input.today{background:color-mix(in srgb,var(--plate) 22%,transparent)!important}
+.days input:focus-visible,.days input:focus{outline:2px solid var(--accent)!important;outline-offset:-2px!important;box-shadow:none!important;background:var(--accent-soft)!important}
+.days input.over{background:color-mix(in srgb,#c0392b 16%,transparent)!important;box-shadow:inset 0 0 0 2px #c0392b!important}
+.days .sv{border-radius:0!important;padding:0!important;background:var(--accent-soft)!important;font:700 13.5px var(--f-num)!important;color:var(--ink)}
+.days .rl.sub{background:var(--accent-soft)}
+.days .sv.tot,.days .rl.tot{background:var(--mint)!important;font-weight:900!important;color:var(--ink);border-bottom:2px solid var(--ink)}
+.days .tc{font:800 13px var(--f-num)}
+.days .tch{font:800 12px var(--f-body)}
+.days .rl.rs{color:var(--ink);font-weight:900}
+@media (max-width:400px){.days{grid-template-columns:56px repeat(7,minmax(0,1fr)) minmax(0,1.08fr)!important}.days .rl{font-size:10.5px!important;letter-spacing:-.03em!important}.days input,.days input.pto{font-size:15px}}
 </style>
 </head>
 <body>
@@ -417,13 +454,13 @@ td{font-weight:600}
         <div class="btns"><button id="npKeep" class="secondary" type="button">Keep hours</button><button id="npClear" class="primary" type="button">Start new period</button></div>
       </div>
       <div class="period" id="period" hidden></div>
-      <div class="wkhead"><p class="label">Week 1</p><span id="wk1t" class="wkt"></span><button id="clearH" class="mini" type="button">Clear hours</button></div>
+      <div class="wkhead"><p class="label">Week 1</p><span id="wk1t" class="wkt" hidden></span><button id="clearH" class="mini" type="button">Clear hours</button></div>
       <div class="days" id="days1"></div>
       <p class="daydet" id="dd1" hidden></p>
-      <div class="wkhead"><p class="label">Week 2</p><span id="wk2t" class="wkt"></span><button id="copy" class="mini" type="button">Copy week 1</button></div>
+      <div class="wkhead"><p class="label">Week 2</p><span id="wk2t" class="wkt" hidden></span><button id="copy" class="mini" type="button">Copy week 1</button></div>
       <div class="days" id="days2"></div>
       <p class="daydet" id="dd2" hidden></p>
-      <button type="button" class="sicktog" id="sickTog" aria-expanded="false">＋ Add sick hours</button>
+      <div class="togs"><button type="button" class="sicktog" id="sickTog" aria-expanded="false">＋ Add sick hours</button><button type="button" class="sicktog" id="lwTog" aria-expanded="false">＋ Add LWOP</button></div>
       <p class="gridmsg" id="gridMsg" role="status"></p>
       <p class="leavew" id="leaveAv" hidden></p>
       <p class="hint">Regular is straight time, up to 8 a day minus any PTO. The rest goes in OT. Weekends and holidays are all OT, and a holiday on a weekend pays normal weekend rates. Tap H for a holiday, or a day name to see its pay.</p>
@@ -533,6 +570,14 @@ td{font-weight:600}
     </div>
     <label class="check"><input type="checkbox" id="shift3"> <span>I work 3rd shift</span></label>
     <div class="hres" id="vRes"></div>
+    <div id="lwBox">
+      <p class="label lwlab">LWOP (leave without pay)</p>
+      <div class="row">
+        <div class="field"><label for="lwLast">Last LWOP before this app</label><input id="lwLast" type="text" inputmode="numeric" placeholder="MM/DD/YYYY" maxlength="10" autocomplete="off"></div>
+        <div class="field"><label for="lwPrior">LWOP hrs before this app, last 12 months</label><input id="lwPrior" type="number" step="0.5" min="0" placeholder="0"></div>
+      </div>
+      <div class="hres" id="lwRes"></div>
+    </div>
   </section>
   <p class="sign">Built on the line, for the line.</p>
   <p class="legal">Estimate only. Your stub and timekeeping records are what count. Not from or endorsed by any employer or union. Not tax, legal or financial advice, and no guarantee it's right. Your numbers stay on your device.</p>
@@ -629,26 +674,41 @@ const vcal=()=>who==="mel"?CAL:who==="prev"?PCAL:null;
 const stale=()=>who==="mel"&&!!CAL&&!!state.mel.periodId&&state.mel.periodId!==CAL.id;
 const hcal=()=>stale()?null:vcal();   // the calendar whose holidays belong to the hours on screen
 let selDay=null;
+// Laid out like the timekeeping page: Regular, Sick, Vacation (LWOP), scheduled subtotal, OT, total, with a Total column.
 [1,2].forEach(wk=>{
   const el=$("days"+wk), o=(wk-1)*7;
-  let html='<span class="rl"></span>';
-  ORDER.forEach(i=>html+=`<button type="button" class="dn${i>4?" we":""}" id="dn${o+i}" aria-pressed="false" aria-label="Week ${wk} ${DAYS[i]} pay breakdown">${DAYS[i]}</button>`);
-  html+='<span class="rl">Regular</span>';
-  ORDER.forEach(i=>html+=`<input type="number" id="h${o+i}" min="0" max="8" step="0.5" aria-label="Week ${wk} ${DAYS[i]} hours worked">`);
-  html+='<span class="rl">OT</span>';
-  ORDER.forEach(i=>html+=`<input type="number" class="ot" id="o${o+i}" placeholder="0" min="0" max="16" step="0.5" aria-label="Week ${wk} ${DAYS[i]} overtime hours">`);
-  html+='<span class="rl">Vacation</span>';
-  ORDER.forEach(i=>html+=`<input type="number" class="pto" id="p${o+i}" placeholder="0" min="0" max="12" step="0.5" aria-label="Week ${wk} ${DAYS[i]} vacation hours">`);
-  html+='<span class="rl sickc">Sick</span>';
-  ORDER.forEach(i=>html+=`<input type="number" class="pto sickc" id="sk${o+i}" placeholder="0" min="0" max="12" step="0.5" aria-label="Week ${wk} ${DAYS[i]} sick leave hours">`);
-  html+='<span class="rl">Holiday</span>';
-  ORDER.forEach(i=>html+=`<button type="button" class="hd" id="hd${o+i}" aria-pressed="false" aria-label="Week ${wk} ${DAYS[i]} holiday">H</button>`);
+  const inRow=(lab,cls,pre,max,aria,ph)=>{let h=`<span class="rl${cls?" "+cls:""}">${lab}</span>`;
+    ORDER.forEach(i=>h+=`<input type="number"${cls||pre!=="h"?` class="${[pre==="o"?"ot":"pto",cls].filter(Boolean).join(" ")}"`:""} id="${pre}${o+i}" min="0" max="${max}" step="0.5" aria-label="Week ${wk} ${DAYS[i]} ${aria}">`);
+    return h+`<span class="tc${cls?" "+cls:""}" id="T${pre}${wk}"></span>`;};
+  const sumRow=(lab,pre,cls)=>{let h=`<span class="rl rs ${cls}">${lab}</span>`;ORDER.forEach(i=>h+=`<span class="sv ${cls}" id="${pre}${o+i}"></span>`);return h+`<span class="tc sv ${cls}" id="T${pre}${wk}"></span>`;};
+  let html='<span class="rl hdr"></span>';   // header: day + date, with the holiday chip under weekdays
+  ORDER.forEach(i=>html+=`<span class="dh${i>4?" we":""}"><button type="button" class="dn${i>4?" we":""}" id="dn${o+i}" aria-pressed="false" aria-label="Week ${wk} ${DAYS[i]} pay breakdown">${DAYS[i]}</button><button type="button" class="hd" id="hd${o+i}" aria-pressed="false" aria-label="Week ${wk} ${DAYS[i]} holiday" title="Holiday">H</button></span>`);
+  html+='<span class="tc tch hdr">Total</span>';
+  html+=inRow("Regular","","h",8,"hours worked",false);
+  html+=inRow("Sick","sickc","sk",12,"sick leave hours",true);
+  html+=inRow("Vacation","","p",12,"vacation hours",true);
+  html+=inRow("LWOP","lwc","lw",12,"leave without pay hours",true);
+  html+=sumRow("Subtotal","sb","sub");
+  html+=inRow("OT","","o",16,"overtime hours",true);
+  html+=sumRow("Total","tt","tot");
   el.innerHTML=html;
 });
+// Fill the subtotal/total rows and the Total column from what's on screen (holiday pay counts 8 on a weekday).
+function renderTotals(){
+  const f=v=>(Math.round(v*10)/10).toFixed(1), v=id=>+$(id).value||0;
+  [0,1].forEach(w=>{const o=w*7,T={h:0,sk:0,p:0,lw:0,o:0,sb:0,tt:0};
+    for(let i=0;i<7;i++){const k=o+i,hol=i<5&&$("hd"+k).getAttribute("aria-pressed")==="true"?8:0;
+      const sb=v("h"+k)+v("sk"+k)+v("p"+k)+v("lw"+k)+hol,tt=sb+v("o"+k);
+      ["h","sk","p","lw","o"].forEach(r=>T[r]+=v(r+k));T.sb+=sb;T.tt+=tt;
+      const hi=$("h"+k);if(hi.value!==""&&!(+hi.value)&&document.activeElement!==hi)hi.value="";   // blanks, not 0s
+      $("sb"+k).textContent=sb?f(sb):"";$("tt"+k).textContent=tt?f(tt):"";}
+    Object.keys(T).forEach(r=>{$("T"+r+(w+1)).textContent=f(T[r]);});});}
 
+// Leaving a box that holds 0 shows it blank, like the timekeeping page.
+["days1","days2"].forEach(id=>$(id).addEventListener("focusout",e=>{const t=e.target;if(t.tagName==="INPUT"&&t.value!==""&&!(+t.value))t.value="";}));
 // Paid time off for a day = vacation + sick (both pay 1× and fill the day's first 8)
 const ptoAt=(p,k)=>(+(p.pto||[])[k]||0)+(+(p.sickD||[])[k]||0);
-const ptoIn=k=>(+$("p"+k).value||0)+(+$("sk"+k).value||0);
+const ptoIn=k=>(+$("p"+k).value||0)+(+$("sk"+k).value||0)+(+$("lw"+k).value||0);   // LWOP takes the place of regular hours too (unpaid)
 
 // Consecutive weekends worked, from the timekeeping page, lined up to the start of this pay period (same "as of" rules as quarter OT).
 function consStart(p){const raw=Math.max(0,Math.floor(num(p.consW,0)));if(p!==state.mel||!CAL)return raw;const off=anchOff(p);
@@ -744,6 +804,8 @@ function read(){
   s.otD=DEF.map((_,i)=>+$("o"+i).value||0);
   s.pto=DEF.map((_,i)=>+$("p"+i).value||0);
   s.sickD=DEF.map((_,i)=>+$("sk"+i).value||0);
+  s.lwD=DEF.map((_,i)=>+$("lw"+i).value||0);
+  if(who==="mel"){s.lwLast=$("lwLast").value.trim();s.lwPrior=$("lwPrior").value;}
   s.holD=DEF.map((_,i)=>$("hd"+i).getAttribute("aria-pressed")==="true");
   s.leave=$("leave").value; s.hol=$("hol").value; s.holw=$("holw").value; s.dues=$("dues").checked;
 }
@@ -761,12 +823,13 @@ function write(){
   $("more").open=!!((+s.credit||0)||(+s.oPre||0)||(+s.oPost||0)||s.step2||(+s.espp||0));
   $("med").value=s.med??MED; $("duesAmt").value=s.duesAmt??DUES; $("mnpl").value=s.mnpl??MNPL; $("ytd").value=s.ytd??"";
   $("fs").value=s.fs||"mfj"; $("rate").value=s.rate; $("k401").value=s.k401; $("extra").value=s.extra; $("loan").value=s.loan;
-  s.hours.forEach((h,i)=>$("h"+i).value=h);
+  s.hours.forEach((h,i)=>$("h"+i).value=h?h:"");
   DEF.forEach((_,i)=>{const v=(s.otD||[])[i];$("o"+i).value=v?v:"";});
-  DEF.forEach((_,i)=>{const v=(s.pto||[])[i];$("p"+i).value=v?v:"";const sv=(s.sickD||[])[i];$("sk"+i).value=sv?sv:"";$("hd"+i).setAttribute("aria-pressed",!!(s.holD||[])[i]);});
+  DEF.forEach((_,i)=>{const v=(s.pto||[])[i];$("p"+i).value=v?v:"";const sv=(s.sickD||[])[i];$("sk"+i).value=sv?sv:"";const lv=(s.lwD||[])[i];$("lw"+i).value=lv?lv:"";$("hd"+i).setAttribute("aria-pressed",!!(s.holD||[])[i]);});
   $("leave").value=s.leave??0; $("hol").value=s.hol??0; $("holw").value=s.holw??0;
   $("legacy").hidden=!((+s.leave||0)||(+s.hol||0)||(+s.holw||0));
   $("dues").checked=s.dues??true;
+  $("lwLast").value=state.mel.lwLast||""; $("lwPrior").value=state.mel.lwPrior??"";
 }
 function dayText(k,s){
   const hol=!!(s.holD||[])[k], d=calc(s).days[k], r=+s.rate||0, q=1.5;
@@ -999,7 +1062,7 @@ function isHolDay(k){return $("hd"+k).getAttribute("aria-pressed")==="true"||!!(
 // While you're typing in a Vacation or Sick box, remember that day's Regular hours from before, so lowering the
 // vacation gives them back (never more than you had).
 let ptoEdit=null;
-document.addEventListener("focusin",e=>{const m=/^(p|sk)(\d+)$/.exec((e.target&&e.target.id)||"");ptoEdit=m?{k:+m[2],reg:Math.max(0,+$("h"+m[2]).value||0)}:null;});
+document.addEventListener("focusin",e=>{const m=/^(p|sk|lw)(\d+)$/.exec((e.target&&e.target.id)||"");ptoEdit=m?{k:+m[2],reg:Math.max(0,+$("h"+m[2]).value||0)}:null;});
 function normalizeDays(){
   const moved=[];
   for(let k=0;k<14;k++){
@@ -1009,7 +1072,7 @@ function normalizeDays(){
     const cap=off?0:Math.max(0,8-pto);
     if(!off&&ptoEdit&&ptoEdit.k===k&&reg<Math.min(ptoEdit.reg,cap)){reg=Math.min(ptoEdit.reg,cap);hi.value=reg;}  // vacation lowered: Regular comes back
     if(reg>cap){
-      const x=+(reg-cap).toFixed(2), ae=document.activeElement, typing=!off&&ae===hi, ptoTyping=!off&&(ae===$("p"+k)||ae===$("sk"+k));
+      const x=+(reg-cap).toFixed(2), ae=document.activeElement, typing=!off&&ae===hi, ptoTyping=!off&&(ae===$("p"+k)||ae===$("sk"+k)||ae===$("lw"+k));
       if(typing){reg=cap;hi.value=reg;moved.push([k,x,off,true]);}          // typing in Regular: stop at the cap
       else if(ptoTyping){reg=cap;hi.value=reg;moved.push([k,x,off,"pto"]);}  // typing vacation/sick: it replaces regular hours, OT stays as is
       else{ot=+(ot+x).toFixed(2);reg=cap;hi.value=reg;oi.value=ot;moved.push([k,x,off,false]);} // PTO, holiday or older entry: move the extra to OT
@@ -1023,11 +1086,11 @@ let gridMsgT;
 function flashGrid(moved){
   if(!moved.length)return;
   const [k,x,off,typing]=moved[moved.length-1], cap=Math.max(0,8-ptoIn(k));
-  $("gridMsg").textContent=off?`${k%7>=5?DAYS[k%7]:"Holiday"} hours are all OT, so ${x} hrs moved to OT.`:typing==="pto"?`Regular drops to ${cap} hrs, since vacation and sick fill the rest of the 8.`:typing?`Regular stops at ${cap} hrs that day. Put the rest in OT.`:`Regular stops at ${cap} hrs that day, so ${x} hrs moved to OT.`;
+  $("gridMsg").textContent=off?`${k%7>=5?DAYS[k%7]:"Holiday"} hours are all OT, so ${x} hrs moved to OT.`:typing==="pto"?`Regular drops to ${cap} hrs, since time off fills the rest of the 8.`:typing?`Regular stops at ${cap} hrs that day. Put the rest in OT.`:`Regular stops at ${cap} hrs that day, so ${x} hrs moved to OT.`;
   clearTimeout(gridMsgT); gridMsgT=setTimeout(()=>{$("gridMsg").textContent="";},5000);
 }
 function render(){renderQEnd();
-  const moved=normalizeDays(); if(document.activeElement&&/^(h|o|p|sk)\d+$/.test(document.activeElement.id||""))flashGrid(moved);
+  const moved=normalizeDays(); if(document.activeElement&&/^(h|o|p|sk|lw)\d+$/.test(document.activeElement.id||""))flashGrid(moved);
   read();renderQRoll();renderSick();renderAsOfHint();renderSeg();if(!$("histTab").hidden)renderHist();
   const s=state[who];
   // Pay calendar (Current only): first time, stamp this period's union holidays
@@ -1052,12 +1115,12 @@ function render(){renderQEnd();
   renderHours(s);
   renderVac(s,c);
   const sum=a=>Math.round(a.reduce((x,y)=>x+(+y||0),0)*10+1e-9)/10;
-  const wkT=(a,b)=>{const h=sum(s.hours.slice(a,b)),o=sum((s.otD||[]).slice(a,b)),p=sum((s.pto||[]).slice(a,b)),sk=sum((s.sickD||[]).slice(a,b));return `${h} Regular · ${o} OT · ${p} Vacation · ${sk} Sick`;};
+  const wkT=(a,b)=>{const h=sum(s.hours.slice(a,b)),o=sum((s.otD||[]).slice(a,b)),p=sum((s.pto||[]).slice(a,b)),sk=sum((s.sickD||[]).slice(a,b)),lw=sum((s.lwD||[]).slice(a,b));return `${h} Regular · ${o} OT · ${p} Vacation · ${sk} Sick${lw?` · ${lw} LWOP`:""}`;};
   $("setup").classList.toggle("ro",who==="prev");$("setup").querySelectorAll("input,select,button").forEach(e=>{if(who==="prev"){if(!e.dataset.roWas){e.dataset.roWas=e.disabled?"1":"0";}e.disabled=true;}else if(e.dataset.roWas){e.disabled=e.dataset.roWas==="1";delete e.dataset.roWas;}});
   $("setupSum").textContent=(who==="prev"?"Using your Current setup · ":"")+((+s.rate>0)?`Your setup · $${(+s.rate).toFixed(2)}/hr · 401(k) ${+((+s.k401||0)+(+s.k401r||0)+(+s.k401a||0)).toFixed(2)}% · ${FSN[s.fs]||FSN.mfj}`:"Your setup · start here")+(s.shift3?" · 3rd shift":"");
   const noRate=!(+s.rate>0);
   $("sNet").textContent=noRate?"Add your rate":money(c.net); $("sGross").textContent=noRate?"—":money(c.gross);
-  renderLeave(s);
+  renderLeave(s); renderTotals();
   $("wk1t").textContent=wkT(0,7);
   $("wk2t").textContent=wkT(7,14);
   DEF.forEach((_,k)=>$("dn"+k).setAttribute("aria-pressed",k===selDay));
@@ -1157,13 +1220,13 @@ Object.entries(INFO).forEach(([id,txt])=>{
 document.querySelectorAll(".hd").forEach(b=>b.addEventListener("click",()=>{
   const k=+b.id.slice(2), s=state[who], on=b.getAttribute("aria-pressed")!=="true";
   s.holStash=s.holStash||{};
-  if(on)s.holStash[k]={h:$("h"+k).value,o:$("o"+k).value,p:$("p"+k).value,sk:$("sk"+k).value};
+  if(on)s.holStash[k]={h:$("h"+k).value,o:$("o"+k).value,p:$("p"+k).value,sk:$("sk"+k).value,lw:$("lw"+k).value};
   b.setAttribute("aria-pressed",on);
-  if(!on&&s.holStash[k]){const st=s.holStash[k];$("h"+k).disabled=false;$("h"+k).value=st.h;$("o"+k).value=st.o;$("p"+k).value=st.p;$("sk"+k).value=st.sk||"";delete s.holStash[k];}
+  if(!on&&s.holStash[k]){const st=s.holStash[k];$("h"+k).disabled=false;$("h"+k).value=st.h;$("o"+k).value=st.o;$("p"+k).value=st.p;$("sk"+k).value=st.sk||"";$("lw"+k).value=st.lw||"";delete s.holStash[k];}
   const m=normalizeDays();render();if(on)flashGrid(m);
 }));
 document.querySelectorAll(".dn").forEach(b=>b.addEventListener("click",()=>{const k=+b.id.slice(2);selDay=selDay===k?null:k;render();}));
-$("copy").onclick=()=>confirmTap($("copy"),()=>{const hs=state[who].holStash||{};for(let i=0;i<7;i++){delete hs[i+7];$("h"+(i+7)).value=$("h"+i).value;$("o"+(i+7)).value=$("o"+i).value;$("p"+(i+7)).value=$("p"+i).value;$("sk"+(i+7)).value=$("sk"+i).value;$("hd"+(i+7)).setAttribute("aria-pressed",(who==="mel"&&CAL&&!stale())?String(HOLIDAYS.has(CAL.dates[i+7])):$("hd"+i).getAttribute("aria-pressed"));} render();});
+$("copy").onclick=()=>confirmTap($("copy"),()=>{const hs=state[who].holStash||{};for(let i=0;i<7;i++){delete hs[i+7];$("h"+(i+7)).value=$("h"+i).value;$("o"+(i+7)).value=$("o"+i).value;$("p"+(i+7)).value=$("p"+i).value;$("sk"+(i+7)).value=$("sk"+i).value;$("lw"+(i+7)).value=$("lw"+i).value;$("hd"+(i+7)).setAttribute("aria-pressed",(who==="mel"&&CAL&&!stale())?String(HOLIDAYS.has(CAL.dates[i+7])):$("hd"+i).getAttribute("aria-pressed"));} render();});
 
 // Visualize presets: starters + the user's own, all editable. Stored with the Visualize profile.
 const STARTERS=[["40 hrs, no OT","40"],["10-hr weekdays","10"],["12-hr weekdays","12"],["10-hr + Saturday","10s"],["10-hr + Sat + Sun","10ss"]];
@@ -1256,7 +1319,7 @@ $("clearH").onclick=()=>confirmTap($("clearH"),()=>{
 });
 function clearDays(){
   state[who].holStash={};
-  for(let k=0;k<14;k++){$("h"+k).value=0;$("o"+k).value="";$("p"+k).value="";$("sk"+k).value="";$("hd"+k).setAttribute("aria-pressed","false");}
+  for(let k=0;k<14;k++){$("h"+k).value=0;$("o"+k).value="";$("p"+k).value="";$("sk"+k).value="";$("lw"+k).value="";$("hd"+k).setAttribute("aria-pressed","false");}
   if(who==="mel"&&CAL){state.mel.periodId=CAL.id;stampHolidays();}
   selDay=null; render();
 }
@@ -1360,10 +1423,17 @@ function renderAsOfHint(){
   $("asOfV").innerHTML=`From your timekeeping page, ${dt}.${warn}`;
 }
 function renderSick(){
-  const s=state[who], has=(s.sickD||[]).some(v=>+v>0), show=!!s.showSick||has;
+  const s=state[who], has=true, show=true;
   $("days1").classList.toggle("nosick",!show); $("days2").classList.toggle("nosick",!show);
   const t=$("sickTog"); t.hidden=has; t.textContent=show?"Hide sick row":"＋ Add sick hours"; t.setAttribute("aria-expanded",String(show));
+  renderLw();
 }
+function renderLw(){
+  const s=state[who], has=(s.lwD||[]).some(v=>+v>0), show=!!s.showLw||has;
+  $("days1").classList.toggle("nolw",!show); $("days2").classList.toggle("nolw",!show);
+  const t=$("lwTog"); t.hidden=has; t.textContent=show?"Hide LWOP row":"＋ Add LWOP"; t.setAttribute("aria-expanded",String(show));
+}
+$("lwTog").onclick=()=>{const s=state[who];s.showLw=!s.showLw;renderLw();save();if(s.showLw)$("lw"+ORDER[0]).focus();};
 $("sickTog").onclick=()=>{const s=state[who];s.showSick=!s.showSick;renderSick();save();if(s.showSick)$("sk"+ORDER[0]).focus();};
 
 // History: each finished Current pay period is saved when the new one starts (Start new period / Keep hours).
@@ -1606,7 +1676,7 @@ $("copyCurH").onclick=()=>confirmTap($("copyCurH"),()=>{
   read(); const src=state.mel;
   for(let k=0;k<14;k++){
     const h=(src.hours||[])[k], o=(src.otD||[])[k], pt=(src.pto||[])[k], sv=(src.sickD||[])[k];
-    $("h"+k).disabled=false; $("h"+k).value=h?h:0; $("o"+k).value=o?o:""; $("p"+k).value=pt?pt:""; $("sk"+k).value=sv?sv:"";
+    $("h"+k).disabled=false; $("h"+k).value=h?h:0; $("o"+k).value=o?o:""; $("p"+k).value=pt?pt:""; $("sk"+k).value=sv?sv:""; $("lw"+k).value=(src.lwD||[])[k]||"";
     $("hd"+k).setAttribute("aria-pressed",String(!!(src.holD||[])[k]));
   }
   state.tif.holStash={}; selDay=null; render();
@@ -1644,16 +1714,56 @@ function leaveCheck(s){
   if(!(who==="mel"||who==="prev"||who==="tif")||!CAL)return null;
   if(who==="mel"&&(s.periodId||CAL.id)!==CAL.id)return null;
   const L=who==="prev"?leaveLedger(s,PPID):leaveLedger(s);if(!L)return null;L.vac=L.availV;L.sick=L.availS;return L;}
+// LWOP rules come from the company attendance policy, not the union contract, as employees describe them
+// (not confirmed): two LWOPs within 60 days of each other are two attendance infractions, so the next safe one is
+// 61 days later (3rd shift: one day more); 48 hrs of LWOP in a rolling 12 months (3rd shift: 39) brings a
+// "Failure to Maintain" corrective action memo. Back-to-back days count as one absence. Contract 8.4(e): LWOP hours
+// in the eligibility year lower the sick leave pay-out. MDA, FMLA and military leave don't count.
+const lwGap=s3=>s3?62:61, lwCap=s3=>s3?39:48;
+function lwDays(){   // [{n: day number, h: hours}] from History, the hours on screen, and the "before this app" boxes
+  const m=state.mel, M=new Map(), dN=q=>{const [y,mo,d]=q.split("-").map(Number);return dayN(new Date(y,mo-1,d));};
+  const put=(id,q)=>{if(!id||!q||!q.lwD)return;const o=dN(id);for(let k=0;k<14;k++){const h=+q.lwD[k]||0;if(h>0)M.set(o+kOff(k),h);else M.delete(o+kOff(k));}};
+  (m.hist||[]).slice().reverse().forEach(h=>put(h.pid,h.p)); put(m.periodId||(CAL&&CAL.id),m);
+  const out=[...M].map(([n,h])=>({n,h})).sort((a,b)=>a.n-b.n);
+  const ld=parseDateMDY(m.lwLast);if(ld){const n=dayN(ld);if(!M.has(n))out.unshift({n,h:Math.max(0,num(m.lwPrior,0)),prior:true});}
+  else if(num(m.lwPrior,0)>0)out.unshift({n:dayN(new Date())-1,h:num(m.lwPrior,0),prior:true});   // no date: count it as recent
+  return out.sort((a,b)=>a.n-b.n);}
+function lwAbsences(days){const g=[];days.forEach(d=>{const L=g[g.length-1];if(L&&d.n-L.end<=3&&!d.prior&&!L.prior)L.end=d.n;else g.push({start:d.n,end:d.n,prior:!!d.prior});});return g;}
+function lwCheck(s){   // warnings for LWOP days on the current or pending screen
+  if(!(who==="mel"||who==="prev")||!CAL)return [];
+  const VC=vcal();if(!VC)return [];
+  const s3=!!state.mel.shift3,gap=lwGap(s3),cap=lwCap(s3),days=lwDays(),abs=lwAbsences(days),out=[];
+  DEF.forEach((_,k)=>{const h=+(s.lwD||[])[k]||0;if(!h)return;const [y,mo,d]=VC.dates[k].split("-").map(Number),n=dayN(new Date(y,mo-1,d));
+    const me=abs.find(a=>n>=a.start&&n<=a.end), prev=abs.filter(a=>a.end<(me?me.start:n)).pop();
+    if(prev&&(me?me.start:n)-prev.end<gap)out.push([k,`LWOP within ${gap-1} days of your last one (${fmtD(nDate(prev.end))}). That's a 2nd attendance infraction.`]);
+    const tot=r1(days.filter(x=>x.n<=n&&x.n>n-365).reduce((t,x)=>t+x.h,0));
+    if(tot>=cap)out.push([k,`This puts you at ${tot} of ${cap} LWOP hrs in 12 months. Reaching ${cap} brings a Failure to Maintain CAM.`]);});
+  return out;}
+function renderLw2(){   // PTO tab block (Current only)
+  const el=$("lwRes"),box=$("lwBox");box.hidden=who!=="mel";if(who!=="mel")return;
+  const m=state.mel,s3=!!m.shift3,gap=lwGap(s3),cap=lwCap(s3),tN=dayN(new Date()),days=lwDays(),abs=lwAbsences(days.filter(d=>d.n<=tN));
+  const last=abs[abs.length-1],tot=r1(days.filter(x=>x.n<=tN&&x.n>tN-365).reduce((t,x)=>t+x.h,0));
+  const sd=parseDateMDY(m.senDate),ann=sd?lastAnn(sd,new Date()):null,yr=ann?r1(days.filter(x=>!x.prior&&x.n>=dayN(ann)&&x.n<=tN).reduce((t,x)=>t+x.h,0)):0;
+  let h="";
+  if(!days.length){h=`<p class="lwl">No LWOP yet. If you've taken any in the last 12 months, add it above.</p>`;}
+  else{const next=last?last.end+gap:null;
+    h+=`<p class="lwl">Next safe LWOP: <b>${next&&next>tN?fmtD(nDate(next)):"any day"}</b>${last?` · last one ${fmtD(nDate(last.end))}`:""}</p>`;
+    h+=`<p class="lwl${tot>cap*0.75?" bad":""}">LWOP in the last 12 months: <b>${tot}</b> of ${cap} hrs</p>`;
+    if(yr>0)h+=`<p class="lwl">${yr} hrs since ${fmtD(ann)} lower your sick leave pay-out at your anniversary (contract 8.4(e)).</p>`;}
+  h+=`<p class="hint">Rules from the attendance policy, as employees describe them. Not confirmed. Two LWOPs within ${gap-1} days count as two infractions; reaching ${cap} hrs in 12 months brings a CAM${s3?" (3rd shift numbers)":""}. Don't enter MDA, FMLA or military leave here.</p>`;
+  el.innerHTML=h;}
 function renderLeave(s){
-  const el=$("leaveAv"),L=leaveCheck(s);
-  DEF.forEach((_,k)=>{$("p"+k).classList.toggle("over",!!(L&&L.overV[k]));$("sk"+k).classList.toggle("over",!!(L&&L.overS[k]));});
-  if(!L||(L.vac===null&&L.sick===null)||(who==="prev"&&!L.days.length)){el.hidden=true;return;}
+  try{renderLw2();}catch(e){}
+  const el=$("leaveAv"),L=leaveCheck(s),LW=lwCheck(s);
+  DEF.forEach((_,k)=>{$("p"+k).classList.toggle("over",!!(L&&L.overV[k]));$("sk"+k).classList.toggle("over",!!(L&&L.overS[k]));$("lw"+k).classList.toggle("over",LW.some(x=>x[0]===k));});
+  const lwHtml=LW.map(([k,t])=>{const VC=vcal(),[y,m,d]=VC.dates[k].split("-").map(Number);return `<span class="lw">${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(y,m-1,d).getDay()]} ${m}/${d}: ${t}</span>`;}).join("");
+  if(!L||(L.vac===null&&L.sick===null)||(who==="prev"&&!L.days.length)){if(lwHtml){el.innerHTML=lwHtml;el.hidden=false;}else el.hidden=true;return;}
   const dn=k=>{const VC=vcal();if(!VC)return ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][k%7]+` (week ${k<7?1:2})`;const [y,m,d]=VC.dates[k].split("-").map(Number);return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(y,m-1,d).getDay()]+" "+m+"/"+d;};
   let h=who==="prev"?"":`<span>Left to use this pay period: ${L.vac===null?"":`<b>${r1(Math.max(0,L.leftV))}</b> vacation`}${L.vac!==null&&L.sick!==null?" · ":""}${L.sick===null?"":`<b>${r1(Math.max(0,L.leftS))}</b> sick`}</span>`;
   L.days.forEach(([k,t,x])=>{h+=`<span class="lw">${dn(k)}: ${x} hrs ${t} won't be paid. You don't have it yet.</span>`;});
   if(who==="mel"){const c=s.cpl;if(c){const [y,m,d]=c.split("-").map(Number),age=dayN(new Date())-dayN(new Date(y,m-1,d));
     if(age>14)h+=`<span class="ls">Your balances were copied ${age} days ago. Copy your timekeeping page again so these stay right.</span>`;}}
-  el.innerHTML=h;el.hidden=false;}
+  el.innerHTML=h+lwHtml;el.hidden=false;}
 // Seniority date becomes years of seniority, since that's what Visualize uses.
 function copySetup(){read(); const src=state.mel, dst=state.tif;
   SETUP_KEYS.forEach(k=>{if(src[k]!==undefined)dst[k]=src[k];});
@@ -1669,7 +1779,7 @@ $("npKeep").onclick=()=>{read();snapPeriod();rollLeave();rollQuarter();addEnds()
   // Kept hours don't belong on this period's holidays: those days start empty. Add hours there only if you work them.
   // And last period's holiday marks don't carry over: a day that was a holiday then is a normal day now.
   const cl=[];DEF.forEach((_,k)=>{if(k%7>=5)return;const hb=$("hd"+k);
-    if(HOLIDAYS.has(CAL.dates[k])){if((+$("h"+k).value||0)+(+$("o"+k).value||0)+ptoIn(k)>0)cl.push(k);$("h"+k).value=0;$("o"+k).value="";$("p"+k).value="";$("sk"+k).value="";}
+    if(HOLIDAYS.has(CAL.dates[k])){if((+$("h"+k).value||0)+(+$("o"+k).value||0)+ptoIn(k)>0)cl.push(k);$("h"+k).value=0;$("o"+k).value="";$("p"+k).value="";$("sk"+k).value="";$("lw"+k).value="";}
     else if(hb.getAttribute("aria-pressed")==="true"){hb.setAttribute("aria-pressed","false");const tot=(+$("h"+k).value||0)+(+$("o"+k).value||0),reg=Math.min(tot,Math.max(0,8-ptoIn(k)));$("h"+k).disabled=false;$("h"+k).value=+reg.toFixed(2);$("o"+k).value=+(tot-reg).toFixed(2)||"";}});
   if(state.mel.holStash)state.mel.holStash={};
   render();
@@ -1718,11 +1828,11 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=42;
+const NOTES_VERSION=43;
 const NOTES=[
-  'Fixed: a new pay period with a holiday in it could add holiday pay to the period that just ended. If yours was hit, it has been corrected',
-  'Keep hours now leaves holidays empty. Add hours there only if you work them',
-  'Hours you change on the Pending check update quarter OT and PTO again'
+  'The hours grid now looks like the timekeeping page: Regular, Sick, Vacation, Subtotal, OT and Total, with a Total column. Blank means 0',
+  'Tap the H under a weekday’s date to mark a holiday',
+  'New: LWOP. Turn it on under the grid. The PTO tab shows your next safe LWOP date and your hours in the last 12 months (rules from coworkers, not the contract)'
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}
@@ -1754,6 +1864,5 @@ let notesShown=false;
 const notesT=setTimeout(()=>{notesShown=true;showNotes();},2500);
 connect().finally(()=>{clearTimeout(notesT);if(!notesShown)showNotes();else if(seen>=NOTES_VERSION)$("whatsnew").hidden=true;});
 </script>
-
 </body>
 </html>

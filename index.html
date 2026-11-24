@@ -381,6 +381,10 @@ td{font-weight:600}
 .days .tc{font:800 13px var(--f-num)}
 .days .tch{font:800 12px var(--f-body)}
 .days .rl.rs{color:var(--ink);font-weight:900}
+@media (max-width:350px){.days{grid-template-columns:46px repeat(7,minmax(0,1fr)) minmax(0,1.05fr)!important}.days .rl{font-size:9.5px!important}.days .dn{font-size:10.5px!important;letter-spacing:-.04em!important}.days .dn small{font-size:11px!important}.days .sv,.days .tc{font-size:10.5px!important;letter-spacing:-.06em!important}.days input,.days input.pto{font-size:13px!important;letter-spacing:-.05em!important}}
+.hist .hdays{grid-template-columns:50px repeat(7,minmax(0,1fr))!important;margin-left:0!important;margin-right:0!important}
+.hist .hdays .dh .dn{display:block}
+@media (max-width:360px){.hist .hdays{grid-template-columns:44px repeat(7,minmax(0,1fr))!important}.hist .hdays .dn{font-size:10.5px!important;letter-spacing:-.04em}.hist .hdays .dn small{font-size:11px}.hist .hdays .rl{font-size:10px!important}}
 @media (max-width:400px){.days{grid-template-columns:56px repeat(7,minmax(0,1fr)) minmax(0,1.08fr)!important}.days .rl{font-size:10.5px!important;letter-spacing:-.03em!important}.days input,.days input.pto{font-size:15px}}
 </style>
 </head>
@@ -574,6 +578,7 @@ td{font-weight:600}
       <p class="label lwlab">LWOP (leave without pay)</p>
       <div class="row">
         <div class="field"><label for="lwLast">Last LWOP before this app</label><input id="lwLast" type="text" inputmode="numeric" placeholder="MM/DD/YYYY" maxlength="10" autocomplete="off"></div>
+        <div class="field"><label for="lwLast2">The one before that (if any)</label><input id="lwLast2" type="text" inputmode="numeric" placeholder="MM/DD/YYYY" maxlength="10" autocomplete="off"></div>
         <div class="field"><label for="lwPrior">LWOP hrs before this app, last 12 months</label><input id="lwPrior" type="number" step="0.5" min="0" placeholder="0"></div>
       </div>
       <div class="hres" id="lwRes"></div>
@@ -805,7 +810,7 @@ function read(){
   s.pto=DEF.map((_,i)=>+$("p"+i).value||0);
   s.sickD=DEF.map((_,i)=>+$("sk"+i).value||0);
   s.lwD=DEF.map((_,i)=>+$("lw"+i).value||0);
-  if(who==="mel"){s.lwLast=$("lwLast").value.trim();s.lwPrior=$("lwPrior").value;}
+  if(who==="mel"){s.lwLast=$("lwLast").value.trim();s.lwLast2=$("lwLast2").value.trim();s.lwPrior=$("lwPrior").value;}
   s.holD=DEF.map((_,i)=>$("hd"+i).getAttribute("aria-pressed")==="true");
   s.leave=$("leave").value; s.hol=$("hol").value; s.holw=$("holw").value; s.dues=$("dues").checked;
 }
@@ -829,7 +834,7 @@ function write(){
   $("leave").value=s.leave??0; $("hol").value=s.hol??0; $("holw").value=s.holw??0;
   $("legacy").hidden=!((+s.leave||0)||(+s.hol||0)||(+s.holw||0));
   $("dues").checked=s.dues??true;
-  $("lwLast").value=state.mel.lwLast||""; $("lwPrior").value=state.mel.lwPrior??"";
+  $("lwLast").value=state.mel.lwLast||""; $("lwLast2").value=state.mel.lwLast2||""; $("lwPrior").value=state.mel.lwPrior??"";
 }
 function dayText(k,s){
   const hol=!!(s.holD||[])[k], d=calc(s).days[k], r=+s.rate||0, q=1.5;
@@ -946,7 +951,7 @@ function showTab(t){if(t==="vac"&&who==="prev"){read();who="mel";PPID=null;selDa
 // Weekly credit: 1 hr per N hours worked (PTO and holiday pay excluded) by seniority (<5 yrs 17, 5-10 16, 10-15 13, 15-20 12, 20-25 11, 25+ 10),
 // to the nearest tenth. Premium hours count as straight hours. 3rd shift worked hours x 8/6.5.
 // Credit goes to sick leave until 40 hrs are earned for the year (the week that crosses 40 still goes to sick), then to vacation.
-function parseDateMDY(v){const m=String(v||"").trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);if(!m)return null;let y=+m[3];if(y<100)y+=2000;const d=new Date(y,+m[1]-1,+m[2]);return d.getMonth()===+m[1]-1&&d.getDate()===+m[2]?d:null;}
+function parseDateMDY(v){v=String(v||"").trim();if(/^\d{8}$/.test(v))v=`${v.slice(0,2)}/${v.slice(2,4)}/${v.slice(4)}`;const m=v.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);if(!m)return null;let y=+m[3];if(y<100)y+=2000;const d=new Date(y,+m[1]-1,+m[2]);return d.getMonth()===+m[1]-1&&d.getDate()===+m[2]?d:null;}
 function yrsBetween(a,b){let y=b.getFullYear()-a.getFullYear();if(b.getMonth()<a.getMonth()||(b.getMonth()===a.getMonth()&&b.getDate()<a.getDate()))y--;return y;}
 function vacDivisor(y){return y<5?17:y<10?16:y<15?13:y<20?12:y<25?11:10;}
 const r1=x=>Math.round(x*10+1e-9)/10;
@@ -1238,7 +1243,7 @@ function renderMine(){
   const box=$("mine"),list=$("mineList"),L=myP();box.textContent="";list.textContent="";
   L.forEach((m,i)=>{
     const b=mk("button",null,m.name);b.type="button";
-    b.addEventListener("click",()=>confirmTap(b,()=>{state.tif.holStash={};for(let k=0;k<14;k++){$("h"+k).disabled=false;$("h"+k).value=m.h[k]||0;$("o"+k).value=m.o[k]||"";$("p"+k).value=m.p[k]||"";$("sk"+k).value=(m.sk||[])[k]||"";$("hd"+k).setAttribute("aria-pressed",String(!!m.hol[k]));}normalizeDays();render();}));
+    b.addEventListener("click",()=>confirmTap(b,()=>{state.tif.holStash={};for(let k=0;k<14;k++){$("h"+k).disabled=false;$("h"+k).value=m.h[k]||0;$("o"+k).value=m.o[k]||"";$("p"+k).value=m.p[k]||"";$("sk"+k).value=(m.sk||[])[k]||"";$("lw"+k).value="";$("hd"+k).setAttribute("aria-pressed",String(!!m.hol[k]));}normalizeDays();render();}));
     box.appendChild(b);
     const row=mk("div","mitem"),nm=mk("input");nm.type="text";nm.maxLength=20;nm.value=m.name;nm.setAttribute("aria-label","Preset name");
     nm.addEventListener("change",()=>{const v=nm.value.trim();if(v){m.name=v;}nm.value=m.name;renderMine();save();});
@@ -1472,7 +1477,7 @@ function addEnds(){const s=state.mel,h=(s.hist||[])[0];if(!h||h.p)return;if(h.qE
 function legacyInit(i,vals,noSave){
   const s=state.mel,h=s.hist[i],[y,m,d]=h.pid.split("-").map(Number),os=new Date(y,m-1,d);
   const pr=JSON.parse(JSON.stringify(s)); ["hist","myPresets","holStash","qRoll","lRoll","anch"].forEach(k=>delete pr[k]);
-  Object.assign(pr,vals); if(!vals.holD)pr.holD=Array(14).fill(false); pr.consW="0"; pr.q160h="0"; pr.vacBal="0"; pr.sickBal="0";
+  Object.assign(pr,vals); if(!vals.holD)pr.holD=Array(14).fill(false); if(!vals.lwD)pr.lwD=Array(14).fill(0); pr.consW="0"; pr.q160h="0"; pr.vacBal="0"; pr.sickBal="0";
   // Sick earned this year at the start: the value that lands on today's number after this period's weeks.
   const endE=Math.max(0,(i===0&&CAL&&h.pid===ymd(addD(CAL.start,-14)))?starts(s).sickE:num(s.sickE,0)), sd=parseDateMDY(s.senDate);
   pr.sickE=String(endE);
@@ -1502,15 +1507,16 @@ function addRollStub(s){
 // Add a past pay period by hand (for periods that ended before History existed, or got cleared).
 // Same layout as the Paycheck tab: days across (Fri → Thu), rows for Regular, OT, Vacation, Sick, Holiday.
 function hoursGrid(os,P){P=P||{};const g=(a,k)=>+((P[a]||[])[k])||0;let out="";
-  [0,7].forEach((o,w)=>{let t=`<p class="hwk">Week ${w+1}</p><div class="days hdays"><span class="rl"></span>`;
-    ORDER.forEach((i,j)=>{const dd=addD(os,o+j);t+=`<span class="dn${i>4?" we":""}">${DAYS[i]}<small>${dd.getDate()}</small></span>`;});
-    t+='<span class="rl">Regular</span>';ORDER.forEach(i=>{const k=o+i;t+=i>4?`<input type="number" data-a="hours" data-k="${k}" disabled placeholder="–" aria-label="${DAYS[i]} regular">`:`<input type="number" inputmode="decimal" step="0.1" min="0" max="8" data-a="hours" data-k="${k}" value="${g("hours",k)}" aria-label="${DAYS[i]} regular">`;});
-    [["otD","OT","ot"],["pto","Vacation","pto"],["sickD","Sick","pto"]].forEach(([a,lb,c])=>{t+=`<span class="rl">${lb}</span>`;ORDER.forEach(i=>{const k=o+i,v=g(a,k);t+=`<input type="number" inputmode="decimal" step="0.1" min="0" class="${c}" data-a="${a}" data-k="${k}" value="${v||""}" placeholder="0" aria-label="${DAYS[i]} ${lb}">`;});});
-    t+='<span class="rl">Holiday</span>';ORDER.forEach(i=>{const k=o+i;t+=`<button type="button" class="hd" data-hk="${k}" aria-pressed="${!!(P.holD||[])[k]}" aria-label="${DAYS[i]} holiday">H</button>`;});
+  const lw=(P.lwD||[]).some(v=>+v>0)||!!state.mel.showLw||lwDays().length>0;   // anyone who uses LWOP gets the row
+  [0,7].forEach((o,w)=>{let t=`<p class="hwk">Week ${w+1}</p><div class="days hdays"><span class="rl hdr"></span>`;
+    ORDER.forEach((i,j)=>{const dd=addD(os,o+j),k=o+i;t+=`<span class="dh${i>4?" we":""}"><span class="dn${i>4?" we":""}">${DAYS[i]}<small>${dd.getDate()}</small></span><button type="button" class="hd" data-hk="${k}" aria-pressed="${!!(P.holD||[])[k]}" aria-label="${DAYS[i]} holiday" title="Holiday">H</button></span>`;});
+    [["hours","Regular",""],["sickD","Sick","pto"],["pto","Vacation","pto"]].concat(lw?[["lwD","LWOP","pto"]]:[],[["otD","OT","ot"]]).forEach(([a,lb,c])=>{t+=`<span class="rl">${lb}</span>`;
+      ORDER.forEach(i=>{const k=o+i,v=g(a,k);t+=a==="hours"&&i>4?`<input type="number" data-a="hours" data-k="${k}" disabled placeholder="–" aria-label="${DAYS[i]} regular">`:`<input type="number" inputmode="decimal" step="0.1" min="0"${a==="hours"?' max="8"':""}${c?` class="${c}"`:""} data-a="${a}" data-k="${k}" value="${v||""}" aria-label="${DAYS[i]} ${lb}">`;});});
     out+=t+'</div>';});
   return out;}
 function wireGrid(f){f.querySelectorAll("button[data-hk]").forEach(b=>b.addEventListener("click",()=>b.setAttribute("aria-pressed",String(b.getAttribute("aria-pressed")!=="true"))));}
 function gridVals(f){const vals={hours:Array(14).fill(0),otD:Array(14).fill(0),pto:Array(14).fill(0),sickD:Array(14).fill(0),holD:Array(14).fill(false)};
+  if(f.querySelector('input[data-a="lwD"]'))vals.lwD=Array(14).fill(0);
   f.querySelectorAll("input[data-a]").forEach(inp=>{if(!inp.disabled)vals[inp.dataset.a][+inp.dataset.k]=Math.max(0,+inp.value||0);});
   f.querySelectorAll("button[data-hk]").forEach(b=>{vals.holD[+b.dataset.hk]=b.getAttribute("aria-pressed")==="true";});return vals;}
 function renderHistAdd(){
@@ -1573,7 +1579,7 @@ function renderHist(){
         (h.qEnd!=null?row("Quarter OT at end",h.qEnd+" hrs"):"")+(h.vacEnd!=null?row("Vacation at end",h.vacEnd+" hrs"):"")+(h.sickEnd!=null?row("Sick at end",h.sickEnd+" hrs"):"")+
         `<div class="hbtns"><button type="button" class="mini hedit">Edit hours</button><button type="button" class="hdel">Delete</button></div><div class="hform" hidden></div></div>`;
     }else{
-    dt.innerHTML=`<summary><span>${md(os)} – ${md(addD(os,13))}<small>Paid ${md(new Date(py,pm-1,pd))}</small></span><b>${money(h.net)}</b></summary><div class="hdet">`+`<p class="hh"><span>${h.reg} Reg · ${r1(h.ot+h.dt)} OT · ${h.vac} Vac · ${h.sick} Sick</span></p>`+
+    dt.innerHTML=`<summary><span>${md(os)} – ${md(addD(os,13))}<small>Paid ${md(new Date(py,pm-1,pd))}</small></span><b>${money(h.net)}</b></summary><div class="hdet">`+`<p class="hh"><span>${h.reg} Reg · ${r1(h.ot+h.dt)} OT · ${h.vac} Vac · ${h.sick} Sick${(x=>x?` · ${x} LWOP`:"")(r1(((h.p||{}).lwD||[]).reduce((t,v)=>t+(+v||0),0)))}</span></p>`+
       row("Straight time",money(h.stPay))+row(`OT 1.5× (${h.ot} hrs)`,money(h.otPay))+row(`Double time (${h.dt} hrs)`,money(h.dtPay))+
       row("Gross",money(h.gross),"t")+row("Federal income tax","−"+money(h.fed))+row("Social Security + Medicare","−"+money(h.fica))+row("Everything else","−"+money(h.other))+
       row("Take-home",money(h.net),"t")+
@@ -1715,48 +1721,54 @@ function leaveCheck(s){
   if(who==="mel"&&(s.periodId||CAL.id)!==CAL.id)return null;
   const L=who==="prev"?leaveLedger(s,PPID):leaveLedger(s);if(!L)return null;L.vac=L.availV;L.sick=L.availS;return L;}
 // LWOP rules come from the company attendance policy, not the union contract, as employees describe them
-// (not confirmed): two LWOPs within 60 days of each other are two attendance infractions, so the next safe one is
-// 61 days later (3rd shift: one day more); 48 hrs of LWOP in a rolling 12 months (3rd shift: 39) brings a
+// (not confirmed): no more than 2 LWOPs in any 60 days (3rd shift: 59, one day less), so a 3rd is safe once the
+// one before last is 61 days back (3rd shift 60); 48 hrs of LWOP in a rolling 12 months (3rd shift: 39) brings a
 // "Failure to Maintain" corrective action memo. Back-to-back days count as one absence. Contract 8.4(e): LWOP hours
 // in the eligibility year lower the sick leave pay-out. MDA, FMLA and military leave don't count.
-const lwGap=s3=>s3?62:61, lwCap=s3=>s3?39:48;
+const lwGap=s3=>s3?60:61, lwCap=s3=>s3?39:48;
 function lwDays(){   // [{n: day number, h: hours}] from History, the hours on screen, and the "before this app" boxes
   const m=state.mel, M=new Map(), dN=q=>{const [y,mo,d]=q.split("-").map(Number);return dayN(new Date(y,mo-1,d));};
   const put=(id,q)=>{if(!id||!q||!q.lwD)return;const o=dN(id);for(let k=0;k<14;k++){const h=+q.lwD[k]||0;if(h>0)M.set(o+kOff(k),h);else M.delete(o+kOff(k));}};
   (m.hist||[]).slice().reverse().forEach(h=>put(h.pid,h.p)); put(m.periodId||(CAL&&CAL.id),m);
-  const out=[...M].map(([n,h])=>({n,h})).sort((a,b)=>a.n-b.n);
-  const ld=parseDateMDY(m.lwLast);if(ld){const n=dayN(ld);if(!M.has(n))out.unshift({n,h:Math.max(0,num(m.lwPrior,0)),prior:true});}
-  else if(num(m.lwPrior,0)>0)out.unshift({n:dayN(new Date())-1,h:num(m.lwPrior,0),prior:true});   // no date: count it as recent
+  const out=[...M].map(([n,h])=>({n,h}));
+  const l2=parseDateMDY(m.lwLast2);if(l2){const n=dayN(l2);if(!M.has(n))out.push({n,h:0,prior:true});}   // hours all sit on the last one
+  const ld=parseDateMDY(m.lwLast);if(ld){const n=dayN(ld);if(!M.has(n))out.push({n,h:Math.max(0,num(m.lwPrior,0)),prior:true});}
+  else if(num(m.lwPrior,0)>0)out.push({n:dayN(new Date())-1,h:num(m.lwPrior,0),prior:true,nd:true});   // hours with no date: they count toward the 12-month total only
   return out.sort((a,b)=>a.n-b.n);}
-function lwAbsences(days){const g=[];days.forEach(d=>{const L=g[g.length-1];if(L&&d.n-L.end<=3&&!d.prior&&!L.prior)L.end=d.n;else g.push({start:d.n,end:d.n,prior:!!d.prior});});return g;}
-function lwCheck(s){   // warnings for LWOP days on the current or pending screen
+const lwTot=(days,n)=>r1(days.filter(x=>x.nd||(x.n<=n&&x.n>n-365)).reduce((t,x)=>t+x.h,0));
+// One absence = LWOP days in a row (a weekend in between doesn't split it).
+function lwAbsences(days){const g=[];days.filter(d=>!d.nd).forEach(d=>{const L=g[g.length-1];if(L&&d.n-L.end<=3)L.end=d.n;else g.push({start:d.n,end:d.n});});return g;}
+function lwCheck(s){   // [k, message or null, day number] for LWOP days on the current or pending screen; said once per absence
   if(!(who==="mel"||who==="prev")||!CAL)return [];
-  const VC=vcal();if(!VC)return [];
-  const s3=!!state.mel.shift3,gap=lwGap(s3),cap=lwCap(s3),days=lwDays(),abs=lwAbsences(days),out=[];
-  DEF.forEach((_,k)=>{const h=+(s.lwD||[])[k]||0;if(!h)return;const [y,mo,d]=VC.dates[k].split("-").map(Number),n=dayN(new Date(y,mo-1,d));
-    const me=abs.find(a=>n>=a.start&&n<=a.end), prev=abs.filter(a=>a.end<(me?me.start:n)).pop();
-    if(prev&&(me?me.start:n)-prev.end<gap)out.push([k,`LWOP within ${gap-1} days of your last one (${fmtD(nDate(prev.end))}). That's a 2nd attendance infraction.`]);
-    const tot=r1(days.filter(x=>x.n<=n&&x.n>n-365).reduce((t,x)=>t+x.h,0));
-    if(tot>=cap)out.push([k,`This puts you at ${tot} of ${cap} LWOP hrs in 12 months. Reaching ${cap} brings a Failure to Maintain CAM.`]);});
+  const pid=who==="prev"?PPID:(state.mel.periodId||CAL.id);if(!pid)return [];   // the period these hours belong to (not always today's)
+  const [py,pm,pd]=pid.split("-").map(Number),o=dayN(new Date(py,pm-1,pd));
+  const s3=!!state.mel.shift3,gap=lwGap(s3),cap=lwCap(s3),days=lwDays(),abs=lwAbsences(days),out=[],said=new Set();let capSaid=false;
+  for(let j=0;j<14;j++){const k=(j<7?0:7)+ORDER[j%7],h=+(s.lwD||[])[k]||0;if(!h)continue;const n=o+j;
+    const me=abs.find(a=>n>=a.start&&n<=a.end), st=me?me.start:n, before=abs.filter(a=>a.end<st), p2=before[before.length-2];
+    if(p2&&st-p2.end<gap){out.push([k,said.has(st)?null:`3rd LWOP within ${gap-1} days (others ${fmtD(nDate(p2.end))} and ${fmtD(nDate(before[before.length-1].end))}). The limit is 2.`,n]);said.add(st);}
+    const tot=lwTot(days,n);
+    if(tot>=cap){out.push([k,capSaid?null:`This puts you at ${tot} of ${cap} LWOP hrs in 12 months. Reaching ${cap} brings a Failure to Maintain CAM.`,n]);capSaid=true;}}
   return out;}
 function renderLw2(){   // PTO tab block (Current only)
   const el=$("lwRes"),box=$("lwBox");box.hidden=who!=="mel";if(who!=="mel")return;
   const m=state.mel,s3=!!m.shift3,gap=lwGap(s3),cap=lwCap(s3),tN=dayN(new Date()),days=lwDays(),abs=lwAbsences(days.filter(d=>d.n<=tN));
-  const last=abs[abs.length-1],tot=r1(days.filter(x=>x.n<=tN&&x.n>tN-365).reduce((t,x)=>t+x.h,0));
+  const last=abs[abs.length-1],tot=lwTot(days,tN);
   const sd=parseDateMDY(m.senDate),ann=sd?lastAnn(sd,new Date()):null,yr=ann?r1(days.filter(x=>!x.prior&&x.n>=dayN(ann)&&x.n<=tN).reduce((t,x)=>t+x.h,0)):0;
   let h="";
   if(!days.length){h=`<p class="lwl">No LWOP yet. If you've taken any in the last 12 months, add it above.</p>`;}
-  else{const next=last?last.end+gap:null;
-    h+=`<p class="lwl">Next safe LWOP: <b>${next&&next>tN?fmtD(nDate(next)):"any day"}</b>${last?` · last one ${fmtD(nDate(last.end))}`:""}</p>`;
+  else{const p2=abs[abs.length-2],next=p2?p2.end+gap:null,inWin=abs.filter(a=>a.end>tN-gap).length;
+    h+=`<p class="lwl${inWin>=2?" bad":""}">LWOPs in the last ${gap-1} days: <b>${Math.min(inWin,9)}</b> of 2</p>`;
+    h+=`<p class="lwl">Next safe LWOP: <b>${inWin>=2&&next&&next>tN?fmtD(nDate(next)):"any day"}</b>${last?` · last one ${fmtD(nDate(last.end))}`:""}</p>`;
     h+=`<p class="lwl${tot>cap*0.75?" bad":""}">LWOP in the last 12 months: <b>${tot}</b> of ${cap} hrs</p>`;
+    if(days.some(d=>d.nd))h+=`<p class="lwl">Add the date of your last LWOP so the ${gap-1}-day count includes it.</p>`;
     if(yr>0)h+=`<p class="lwl">${yr} hrs since ${fmtD(ann)} lower your sick leave pay-out at your anniversary (contract 8.4(e)).</p>`;}
-  h+=`<p class="hint">Rules from the attendance policy, as employees describe them. Not confirmed. Two LWOPs within ${gap-1} days count as two infractions; reaching ${cap} hrs in 12 months brings a CAM${s3?" (3rd shift numbers)":""}. Don't enter MDA, FMLA or military leave here.</p>`;
+  h+=`<p class="hint">Rules from the attendance policy, as employees describe them. Not confirmed. No more than 2 LWOPs in any ${gap-1} days; reaching ${cap} hrs in 12 months brings a CAM${s3?" (3rd shift numbers)":""}. Don't enter MDA, FMLA or military leave here.</p>`;
   el.innerHTML=h;}
 function renderLeave(s){
   try{renderLw2();}catch(e){}
   const el=$("leaveAv"),L=leaveCheck(s),LW=lwCheck(s);
   DEF.forEach((_,k)=>{$("p"+k).classList.toggle("over",!!(L&&L.overV[k]));$("sk"+k).classList.toggle("over",!!(L&&L.overS[k]));$("lw"+k).classList.toggle("over",LW.some(x=>x[0]===k));});
-  const lwHtml=LW.map(([k,t])=>{const VC=vcal(),[y,m,d]=VC.dates[k].split("-").map(Number);return `<span class="lw">${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(y,m-1,d).getDay()]} ${m}/${d}: ${t}</span>`;}).join("");
+  const lwHtml=LW.filter(x=>x[1]).map(([k,t,n])=>{const d=nDate(n);return `<span class="lw">${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]} ${d.getMonth()+1}/${d.getDate()}: ${t}</span>`;}).join("");
   if(!L||(L.vac===null&&L.sick===null)||(who==="prev"&&!L.days.length)){if(lwHtml){el.innerHTML=lwHtml;el.hidden=false;}else el.hidden=true;return;}
   const dn=k=>{const VC=vcal();if(!VC)return ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][k%7]+` (week ${k<7?1:2})`;const [y,m,d]=VC.dates[k].split("-").map(Number);return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(y,m-1,d).getDay()]+" "+m+"/"+d;};
   let h=who==="prev"?"":`<span>Left to use this pay period: ${L.vac===null?"":`<b>${r1(Math.max(0,L.leftV))}</b> vacation`}${L.vac!==null&&L.sick!==null?" · ":""}${L.sick===null?"":`<b>${r1(Math.max(0,L.leftS))}</b> sick`}</span>`;
@@ -1772,6 +1784,9 @@ function copySetup(){read(); const src=state.mel, dst=state.tif;
 $("copyCur").onclick=()=>confirmTap($("copyCur"),copySetup);
 $("copyCurVac").onclick=()=>confirmTap($("copyCurVac"),copySetup);
 $("tabPay").onclick=()=>showTab("pay"); $("tabHrs").onclick=()=>showTab("hrs"); $("tabVac").onclick=()=>showTab("vac"); $("tabHist").onclick=()=>showTab("hist");
+document.addEventListener("input",e=>{const el=e.target;if(!el||(el.id!=="lwLast"&&el.id!=="lwLast2"))return;const v=el.value;
+  if(!/^[\d\/]*$/.test(v)||!v.split("/").slice(0,-1).every(p=>p.length===2))return;   // typed their own way (like 9/4/2026): leave it
+  const d=v.replace(/\D/g,"").slice(0,8);el.value=d.length>4?`${d.slice(0,2)}/${d.slice(2,4)}/${d.slice(4)}`:d.length>2?`${d.slice(0,2)}/${d.slice(2)}`:d;},true);
 [["senM","senD",2],["senD","senY",2]].forEach(([a,b,n])=>$(a).addEventListener("input",()=>{if($(a).value.replace(/\D/g,"").length>=n)$(b).focus();}));
 $("hDay").addEventListener("change",()=>{const k=+$("hDay").value;$("hHol").checked=hcal()?HOLIDAYS.has(hcal().dates[k]):$("hd"+k).getAttribute("aria-pressed")==="true";$("hMsg").textContent="";render();});
 $("hAdd").onclick=()=>{const s=state[who],h=hoursCalc(s);if(!h)return;{const rg=+h.d.st.toFixed(1);$("h"+h.k).value=rg;$("o"+h.k).value=+(h.w-rg).toFixed(1)||"";}$("p"+h.k).value=h.p||"";$("hd"+h.k).setAttribute("aria-pressed",h.hol);selDay=h.k;render();$("hMsg").textContent=`Put on ${dayLabel(h.k)}: ${h.w} hrs worked${h.p?`, ${h.p} PTO`:""}${h.hol?", holiday":""}. Switch to Paycheck to see your check.`;};
@@ -1781,9 +1796,10 @@ $("npKeep").onclick=()=>{read();snapPeriod();rollLeave();rollQuarter();addEnds()
   const cl=[];DEF.forEach((_,k)=>{if(k%7>=5)return;const hb=$("hd"+k);
     if(HOLIDAYS.has(CAL.dates[k])){if((+$("h"+k).value||0)+(+$("o"+k).value||0)+ptoIn(k)>0)cl.push(k);$("h"+k).value=0;$("o"+k).value="";$("p"+k).value="";$("sk"+k).value="";$("lw"+k).value="";}
     else if(hb.getAttribute("aria-pressed")==="true"){hb.setAttribute("aria-pressed","false");const tot=(+$("h"+k).value||0)+(+$("o"+k).value||0),reg=Math.min(tot,Math.max(0,8-ptoIn(k)));$("h"+k).disabled=false;$("h"+k).value=+reg.toFixed(2);$("o"+k).value=+(tot-reg).toFixed(2)||"";}});
+  let lwCl=false;DEF.forEach((_,k)=>{if(+$("lw"+k).value){lwCl=true;$("lw"+k).value="";}});
   if(state.mel.holStash)state.mel.holStash={};
   render();
-  if(cl.length){$("gridMsg").textContent=`${cl.map(k=>dayLabel(k)).join(" and ")}: holiday, so the kept hours were cleared. Add hours there only if you work it.`;clearTimeout(gridMsgT);gridMsgT=setTimeout(()=>{$("gridMsg").textContent="";},9000);}};
+  if(cl.length||lwCl){$("gridMsg").textContent=(cl.length?`${cl.map(k=>dayLabel(k)).join(" and ")}: holiday, so the kept hours were cleared. Add hours there only if you work it.`:"")+(cl.length&&lwCl?" ":"")+(lwCl?"LWOP isn't kept. Add it again only if you take it.":"");clearTimeout(gridMsgT);gridMsgT=setTimeout(()=>{$("gridMsg").textContent="";},9000);}};
 // One-time repair for anyone who opened the app Nov 20 or later on v41 or older: the new period's holidays
 // (Thanksgiving) were stamped onto the period that had just ended. Signature: a day marked holiday that isn't one
 // on its own calendar but is one, same weekday slot, in the period right after it.
@@ -1828,11 +1844,11 @@ setInterval(tick,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("defBox").hidden)closeDef();});
 // What's new: bump NOTES_VERSION and edit NOTES with each update
-const NOTES_VERSION=43;
+const NOTES_VERSION=44;
 const NOTES=[
-  'The hours grid now looks like the timekeeping page: Regular, Sick, Vacation, Subtotal, OT and Total, with a Total column. Blank means 0',
-  'Tap the H under a weekday’s date to mark a holiday',
-  'New: LWOP. Turn it on under the grid. The PTO tab shows your next safe LWOP date and your hours in the last 12 months (rules from coworkers, not the contract)'
+  'Fixed: History → Edit hours lined up under the wrong days on phones. It now looks like the Paycheck grid',
+  'LWOP: up to 2 in 60 days are fine. The 3rd gets flagged. Add your last two LWOP dates on the PTO tab (just type the numbers)',
+  'Keep hours no longer copies LWOP into the new pay period'
 ];
 function showNotes(){if(!ack){$("ackBox").hidden=false;try{$("ackOk").focus();}catch(e){}return;}if(seen<NOTES_VERSION){$("wnList").innerHTML=NOTES.map(n=>`<li>${n}</li>`).join("");$("whatsnew").hidden=false;try{$("wnOk").focus();}catch(e){}}}
 function closeNotes(){seen=NOTES_VERSION;$("whatsnew").hidden=true;save();}
